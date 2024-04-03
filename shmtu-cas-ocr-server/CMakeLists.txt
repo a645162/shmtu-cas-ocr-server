@@ -27,27 +27,31 @@ project(SHMTU_CAS_Server VERSION 1.0.0)
 set(CMAKE_CXX_STANDARD 11)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+set(BUILD_SHARED_LIBS ON)
+
 message(STATUS "SHMTU_CAS_Server version: ${PROJECT_VERSION}")
 add_definitions(-DSHMTU_CAS_SERVER_VERSION="${PROJECT_VERSION}")
 message(STATUS "System: ${CMAKE_SYSTEM_NAME}")
 message(STATUS "C++ standard used: C++${CMAKE_CXX_STANDARD}")
+message(STATUS "Build shared libraries: ${BUILD_SHARED_LIBS}")
+
 if (WIN32)
     # Windows
 
-    set(OpenCV_DIR "./3rdparty/OpenCV/opencv500-vs2022/install")
-    set(Poco_DIR "./3rdparty/Poco/poco-poco-1.13.2-build/install/cmake")
-    set(fmt_DIR "./3rdparty/fmt/fmt-10.2.1-build/install/lib/cmake/fmt")
+    set(OpenCV_DIR "../3rdparty/OpenCV/opencv500-vs2022/install")
+    set(Poco_DIR "../3rdparty/Poco/poco-poco-1.13.2-build/install/cmake")
+    set(fmt_DIR "../3rdparty/fmt/fmt-10.2.1-build/install/lib/cmake/fmt")
 
     if (CMAKE_BUILD_TYPE STREQUAL "Debug")
         message(STATUS "Debug Mode")
         set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /MDd")
-        set(ncnn_DIR "./3rdparty/NCNN/ncnn-vs2022-debug/install/lib/cmake/ncnn")
+        set(ncnn_DIR "../3rdparty/NCNN/ncnn-vs2022-debug/install/lib/cmake/ncnn")
     else ()
         message(STATUS "Release Mode")
         add_definitions(-D_ITERATOR_DEBUG_LEVEL=0)
         set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /MD")
-        set(ncnn_DIR "./3rdparty/NCNN/ncnn-vs2022-release/install/lib/cmake/ncnn")
-#        set(ncnn_DIR "./3rdparty/NCNN/ncnn-20240102-windows-vs2022/x64/lib/cmake/ncnn")
+
+        set(ncnn_DIR "../3rdparty/NCNN/ncnn-vs2022-release/install/lib/cmake/ncnn")
     endif ()
 
     message(STATUS "CMAKE_CXX_FLAGS: ${CMAKE_CXX_FLAGS}")
@@ -96,7 +100,7 @@ find_package(ncnn REQUIRED)
 find_package(fmt REQUIRED)
 
 include_directories(
-        ${PROJECT_SOURCE_DIR}/3rdparty/Tclap/tclap-1.4.0-rc1/include
+        ${PROJECT_SOURCE_DIR}/../3rdparty/Tclap/tclap-1.4.0-rc1/include
 )
 
 set(SOURCES
