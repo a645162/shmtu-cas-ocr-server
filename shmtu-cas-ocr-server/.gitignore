@@ -120,3 +120,5 @@ _deps
 *.exe
 *.out
 *.app
+
+/shmtu-cas-ocr-server.vcxproj.DotSettings
