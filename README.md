@@ -2,6 +2,13 @@
 
 ShangHai Maritime University CAS OCR Server
 
+## Build
+
+[Build构建指南](shmtu-cas-ocr-server/Build.md)
+
+**注意：**
+Windows下构建比较麻烦，建议使用Vcpkg或者不要使用Windows。
+
 ## 本系列项目
 
 ### 客户端
@@ -38,7 +45,3 @@ https://github.com/a645162/shmtu-cas-ocr-demo-windows
 https://github.com/a645162/shmtu-cas-ocr-demo-qt
 * Android客户端
 https://github.com/a645162/shmtu-cas-demo-android
-
-## Build
-
-[Build Guide](Build.md)

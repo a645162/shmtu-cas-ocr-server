@@ -4,20 +4,11 @@
 cmake_minimum_required(VERSION 3.14)
 message(STATUS "CMake version: ${CMAKE_VERSION}")
 
-if (NOT DEFINED CMAKE_BUILD_TYPE)
-    set(
-            CMAKE_BUILD_TYPE Release
-            CACHE STRING "Choose the type of build, options are: None Debug Release RelWithDebInfo MinSizeRel." FORCE
-    )
-endif ()
-message(STATUS "Build type: ${CMAKE_BUILD_TYPE}")
+option(CMAKE_BUILD_TYPE "CMake Build Type" Release)
 
-if (NOT DEFINED CMAKE_INSTALL_PREFIX)
-    set(
-            CMAKE_INSTALL_PREFIX "${CMAKE_BINARY_DIR}/install"
-            CACHE PATH "Install path prefix, prepended onto install directories." FORCE
-    )
-endif ()
+option(CMAKE_INSTALL_PREFIX "Install path" "${CMAKE_BINARY_DIR}/install")
+
+message(STATUS "Build type: ${CMAKE_BUILD_TYPE}")
 message(STATUS "Install prefix: ${CMAKE_INSTALL_PREFIX}")
 
 project(SHMTU_CAS_Server VERSION 1.0.0)
@@ -27,7 +18,7 @@ project(SHMTU_CAS_Server VERSION 1.0.0)
 set(CMAKE_CXX_STANDARD 11)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-set(BUILD_SHARED_LIBS ON)
+option(BUILD_SHARED_LIBS "Build Shared Libs" ON)
 
 message(STATUS "SHMTU_CAS_Server version: ${PROJECT_VERSION}")
 add_definitions(-DSHMTU_CAS_SERVER_VERSION="${PROJECT_VERSION}")

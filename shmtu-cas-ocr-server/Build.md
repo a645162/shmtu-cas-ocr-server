@@ -29,6 +29,10 @@ sudo apt install -y libtclap-dev libopencv-dev libpoco-dev libfmt-dev
 
 Build or Download NCNN
 
+```bash
+./3rdparty/NCNN/ubuntu_ncnn.sh
+```
+
 Install Vulkan SDK
 
 ### Arch Linux
@@ -40,6 +44,10 @@ sudo pacman -S opencv poco fmt ncnn tclap
 sudo pacman -S vulkan-headers vulkan-validation-layers vulkan-tools
 vulkaninfo
 ```
+
+### Fedora
+
+Coming soon...
 
 ## macOS
 

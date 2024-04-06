@@ -131,6 +131,13 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <ExternalIncludePath>..\3rdparty\Tclap\tclap-1.4.0-rc1\include;..\3rdparty\Poco\poco-poco-1.13.2-build\install\include;..\3rdparty\OpenCV\opencv500-vs2022\install\include;..\3rdparty\NCNN\ncnn-vs2022-release\install\include\ncnn;..\3rdparty\fmt\fmt-10.2.1-build\install\include\fmt;$(ExternalIncludePath)</ExternalIncludePath>
   </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Static|x64'">
+    <ExternalIncludePath>..\3rdparty\Tclap\tclap-1.4.0-rc1\include;..\3rdparty\Poco\poco-poco-1.13.2-static\install\include;..\3rdparty\OpenCV\opencv500-vs2022-static\install\include;..\3rdparty\NCNN\ncnn-vs2022-static\install\include\ncnn;..\3rdparty\fmt\fmt-10.2.1-build\install\include\fmt;$(ExternalIncludePath)</ExternalIncludePath>
+    <LibraryPath>..\3rdparty\Poco\poco-poco-1.13.2-static\install\lib;$(LibraryPath)</LibraryPath>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <LibraryPath>$(LibraryPath)</LibraryPath>
+  </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>
@@ -215,6 +222,14 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Static|x64'">
+    <ClCompile>
+      <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
+    </ClCompile>
+    <Link>
+      <AdditionalDependencies>..\3rdparty\fmt\fmt-10.2.1-build\install\lib\*.lib;..\3rdparty\OpenCV\opencv500-vs2022-static\install\x64\vc17\lib\*.lib;..\3rdparty\NCNN\ncnn-vs2022-static\install\lib\*.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
