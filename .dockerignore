@@ -1,0 +1,58 @@
+# Build artifacts
+build/
+cmake-build-*/
+install/
+
+# IDE
+.idea/
+.vs/
+.vscode/
+*.swp
+*.swo
+
+# Git
+.git/
+.gitignore
+
+# Old server source (pre-refactor)
+shmtu-cas-ocr-server/CAS_OCR.*
+shmtu-cas-ocr-server/main.cpp
+shmtu-cas-ocr-server/*.vcxproj*
+shmtu-cas-ocr-server/app_win32.rc
+shmtu-cas-ocr-server/logopng.fw.ico
+shmtu-cas-ocr-server/conanfile.txt
+shmtu-cas-ocr-server/conan_provider.cmake
+shmtu-cas-ocr-server/CMakeUserPresets.json
+shmtu-cas-ocr-server/Build.md
+shmtu-cas-ocr-server/Conan.md
+shmtu-cas-ocr-server/README.md
+shmtu-cas-ocr-server/.gitignore
+shmtu-cas-ocr-server/.idea/
+
+# Solution files
+*.sln
+
+# 3rdparty (rebuilt in Docker)
+3rdparty/
+
+# Checkpoints (models mounted at runtime)
+Checkpoint/
+
+# Python scripts
+Scripts/
+
+# Documentation
+*.md
+!README.md
+
+# Docker (avoid recursive copy)
+Dockerfile
+docker-compose.yml
+.dockerignore
+
+# Misc
+*.o
+*.a
+*.so
+*.dylib
+*.exe

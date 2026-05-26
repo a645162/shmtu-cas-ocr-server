@@ -1,0 +1,62 @@
+version: "3.8"
+
+services:
+  # ------------------------------------------------------------------
+  # CPU-only build (default)
+  # ------------------------------------------------------------------
+  shmtu-cas-ocr-server:
+    build:
+      context: .
+      target: runtime-cpu
+      args:
+        BUILD_TARGET: cpu
+    image: shmtu-cas-ocr-server:cpu
+    container_name: shmtu-cas-ocr-server
+    ports:
+      - "21600:21600"  # HTTP RESTful API
+      - "21601:21601"  # TCP legacy protocol
+    volumes:
+      - ./models:/app/models:ro
+    environment:
+      - LD_LIBRARY_PATH=/usr/local/lib
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:21600/api/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+  # ------------------------------------------------------------------
+  # GPU-enabled build (NVIDIA Vulkan)
+  # Uncomment and use this instead of the CPU service above.
+  # ------------------------------------------------------------------
+  # shmtu-cas-ocr-server-gpu:
+  #   build:
+  #     context: .
+  #     target: runtime-gpu
+  #     args:
+  #       BUILD_TARGET: gpu
+  #   image: shmtu-cas-ocr-server:gpu
+  #   container_name: shmtu-cas-ocr-server-gpu
+  #   ports:
+  #     - "21600:21600"
+  #     - "21601:21601"
+  #   volumes:
+  #     - ./models:/app/models:ro
+  #   environment:
+  #     - LD_LIBRARY_PATH=/usr/local/lib
+  #   deploy:
+  #     resources:
+  #       reservations:
+  #         devices:
+  #           - driver: nvidia
+  #             count: 1
+  #             capabilities: [gpu]
+  #   restart: unless-stopped
+  #   healthcheck:
+  #     test: ["CMD", "curl", "-f", "http://localhost:21600/api/health"]
+  #     interval: 30s
+  #     timeout: 5s
+  #     retries: 3
+  #     start_period: 10s

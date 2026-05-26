@@ -1,0 +1,8 @@
+[requires]
+poco/1.13.3
+fmt/11.0.1
+opencv/4.10.0
+
+[generators]
+CMakeDeps
+CMakeToolchain
