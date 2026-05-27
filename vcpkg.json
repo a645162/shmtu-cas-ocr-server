@@ -1,0 +1,26 @@
+{
+  "name": "shmtu-cas-ocr-server",
+  "version-string": "1.0.0",
+  "dependencies": [
+    "fmt",
+    "opencv4",
+    "ncnn",
+    "drogon",
+    "trantor",
+    "wxwidgets"
+  ],
+  "features": {
+    "vulkan": {
+      "description": "Enable Vulkan support in ncnn.",
+      "dependencies": [
+        {
+          "name": "ncnn",
+          "default-features": false,
+          "features": [
+            "vulkan"
+          ]
+        }
+      ]
+    }
+  }
+}

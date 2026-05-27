@@ -3,13 +3,6 @@ cmake_minimum_required(VERSION 3.20)
 project(shmtu-cas-ocr-lib VERSION ${PROJECT_VERSION} LANGUAGES CXX)
 
 # --------------------------------------------------------------------------
-# Vulkan / GPU support
-# --------------------------------------------------------------------------
-if(USE_VULKAN)
-    add_definitions(-DNCNN_SUPPORT_VULKAN)
-endif()
-
-# --------------------------------------------------------------------------
 # Dependencies
 # --------------------------------------------------------------------------
 find_package(OpenCV REQUIRED COMPONENTS core imgproc imgcodecs)
@@ -26,14 +19,6 @@ set(LIB_HEADERS_PUBLIC
     include/shmtu/cas_ocr/cas_ocr.h
     include/shmtu/cas_ocr/types.h
 )
-
-# --------------------------------------------------------------------------
-# Sources — server component (only when building the server)
-# --------------------------------------------------------------------------
-if(BUILD_SERVER)
-    list(APPEND LIB_SOURCES src/server.cpp)
-    list(APPEND LIB_HEADERS_PUBLIC include/shmtu/cas_ocr/server.h)
-endif()
 
 # --------------------------------------------------------------------------
 # Static library target
@@ -56,16 +41,10 @@ target_link_libraries(shmtu_cas_ocr_lib
         ncnn
 )
 
-# Server component needs httplib and Poco
-if(BUILD_SERVER)
-    find_package(Poco REQUIRED COMPONENTS Foundation Net)
-    target_link_libraries(shmtu_cas_ocr_lib
-        PUBLIC
-            httplib::httplib
-            Poco::Foundation
-            Poco::Net
-    )
-endif()
+target_compile_definitions(shmtu_cas_ocr_lib
+    PUBLIC
+        $<$<BOOL:${USE_VULKAN}>:NCNN_SUPPORT_VULKAN>
+)
 
 target_compile_features(shmtu_cas_ocr_lib PUBLIC cxx_std_20)
 

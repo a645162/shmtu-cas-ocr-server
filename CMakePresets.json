@@ -1,0 +1,51 @@
+{
+  "version": 6,
+  "cmakeMinimumRequired": {
+    "major": 3,
+    "minor": 23,
+    "patch": 0
+  },
+  "configurePresets": [
+    {
+      "name": "base",
+      "hidden": true,
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build/${presetName}",
+      "cacheVariables": {
+        "CMAKE_CXX_STANDARD": "20",
+        "BUILD_SERVER": "ON",
+        "BUILD_CLI": "ON",
+        "BUILD_SHARED_LIBS": "OFF"
+      }
+    },
+    {
+      "name": "linux-vcpkg",
+      "inherits": "base",
+      "cacheVariables": {
+        "CMAKE_TOOLCHAIN_FILE": "$env{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake",
+        "VCPKG_MANIFEST_MODE": "ON",
+        "VCPKG_FEATURE_FLAGS": "manifests",
+        "VCPKG_MANIFEST_FEATURES": "",
+        "USE_VULKAN": "OFF"
+      }
+    },
+    {
+      "name": "linux-vcpkg-vulkan",
+      "inherits": "linux-vcpkg",
+      "cacheVariables": {
+        "VCPKG_MANIFEST_FEATURES": "vulkan",
+        "USE_VULKAN": "ON"
+      }
+    }
+  ],
+  "buildPresets": [
+    {
+      "name": "build-linux-vcpkg",
+      "configurePreset": "linux-vcpkg"
+    },
+    {
+      "name": "build-linux-vcpkg-vulkan",
+      "configurePreset": "linux-vcpkg-vulkan"
+    }
+  ]
+}

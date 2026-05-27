@@ -11,15 +11,9 @@ project(SHMTU_CAS_OCR VERSION 1.0.0 LANGUAGES CXX)
 # --------------------------------------------------------------------------
 option(BUILD_SERVER "Build the HTTP/TCP server executable" ON)
 option(BUILD_CLI    "Build the CLI tool executable" ON)
+option(BUILD_GUI    "Build the GUI application" OFF)
 option(USE_VULKAN   "Enable Vulkan/GPU support via ncnn" OFF)
 option(BUILD_SHARED_LIBS "Build shared libraries" OFF)
-
-# --------------------------------------------------------------------------
-# Conan integration (CMake dependency provider)
-# --------------------------------------------------------------------------
-if(EXISTS "${CMAKE_SOURCE_DIR}/conan_provider.cmake")
-    include("${CMAKE_SOURCE_DIR}/conan_provider.cmake")
-endif()
 
 # --------------------------------------------------------------------------
 # Global C++ standard
@@ -39,10 +33,11 @@ message(STATUS "C++ standard: C++${CMAKE_CXX_STANDARD}")
 message(STATUS "Build shared libraries: ${BUILD_SHARED_LIBS}")
 message(STATUS "Build server: ${BUILD_SERVER}")
 message(STATUS "Build CLI:    ${BUILD_CLI}")
+message(STATUS "Build GUI:    ${BUILD_GUI}")
 message(STATUS "Use Vulkan:   ${USE_VULKAN}")
 
 # --------------------------------------------------------------------------
-# 3rdparty hint paths (used when Conan is not active)
+# 3rdparty hint paths
 # --------------------------------------------------------------------------
 if(WIN32)
     set(OpenCV_DIR       "${CMAKE_SOURCE_DIR}/3rdparty/OpenCV/opencv500-vs2022/install")
@@ -62,24 +57,16 @@ elseif(CMAKE_SYSTEM_NAME MATCHES "Linux")
         OUTPUT_QUIET ERROR_QUIET
     )
     if(NOT PACMAN_RESULT EQUAL 0)
-        set(ncnn_DIR "${CMAKE_SOURCE_DIR}/3rdparty/NCNN/ncnn-20240102-ubuntu-2204/lib/cmake/ncnn")
+        file(GLOB SHMTU_LOCAL_NCNN_CMAKE_DIRS
+            LIST_DIRECTORIES true
+            "${CMAKE_SOURCE_DIR}/3rdparty/NCNN/ncnn-*-ubuntu-*/lib/cmake/ncnn"
+        )
+        if(SHMTU_LOCAL_NCNN_CMAKE_DIRS)
+            list(SORT SHMTU_LOCAL_NCNN_CMAKE_DIRS ORDER DESCENDING)
+            list(GET SHMTU_LOCAL_NCNN_CMAKE_DIRS 0 ncnn_DIR)
+            message(STATUS "Using bundled ncnn package config from ${ncnn_DIR}")
+        endif()
     endif()
-endif()
-
-# --------------------------------------------------------------------------
-# FetchContent — cpp-httplib (header-only, used by server)
-# --------------------------------------------------------------------------
-include(FetchContent)
-
-FetchContent_Declare(
-    cpp-httplib
-    GIT_REPOSITORY https://github.com/yhirose/cpp-httplib.git
-    GIT_TAG        v0.18.3
-)
-
-# Only fetch if we are building the server
-if(BUILD_SERVER)
-    FetchContent_MakeAvailable(cpp-httplib)
 endif()
 
 # --------------------------------------------------------------------------
@@ -93,4 +80,8 @@ endif()
 
 if(BUILD_CLI)
     add_subdirectory(shmtu-cas-ocr-cli)
+endif()
+
+if(BUILD_GUI AND EXISTS "${CMAKE_SOURCE_DIR}/shmtu-cas-ocr-gui/CMakeLists.txt")
+    add_subdirectory(shmtu-cas-ocr-gui)
 endif()

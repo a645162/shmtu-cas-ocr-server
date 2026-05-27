@@ -6,12 +6,53 @@ ShangHai Maritime University CAS OCR Server
 
 请前往[shmtu-cas-ocr-model](https://github.com/a645162/shmtu-cas-ocr-model)项目的[Github Release](https://github.com/a645162/shmtu-cas-ocr-model/releases)中下载NCNN版权重。
 
+Ubuntu 下如果使用 Tencent 官方预编译版 ncnn，可运行：
+
+```bash
+python3 3rdparty/NCNN/download_ncnn.py
+```
+
+脚本会交互式要求选择 `Ubuntu 22.04` 或 `Ubuntu 24.04`，默认下载 `20260526` release，并解压到 `3rdparty/NCNN/`。如果需要指定版本，可使用：
+
+```bash
+python3 3rdparty/NCNN/download_ncnn.py --tag 20260526 --ubuntu 2404
+```
+
+当前工程在 Linux 下会自动优先探测 `3rdparty/NCNN/` 内最新的 `ncnn-*-ubuntu-*` 目录。
+
 ## Build
 
 [Build构建指南](shmtu-cas-ocr-server/Build.md)
 
 **注意：**
 Windows下构建比较麻烦，建议使用Vcpkg或者不要使用Windows。
+
+当前仓库已切换为 `vcpkg manifest` 依赖管理，不再使用 Conan。
+
+Linux 下推荐流程：
+
+```bash
+export VCPKG_ROOT=/path/to/vcpkg
+cmake --preset linux-vcpkg
+cmake --build --preset build-linux-vcpkg
+```
+
+如果要启用 Vulkan：
+
+```bash
+export VCPKG_ROOT=/path/to/vcpkg
+vcpkg install --x-manifest-root=. --feature-flags=manifests --x-no-default-features --x-feature=vulkan
+cmake --preset linux-vcpkg-vulkan
+cmake --build --preset build-linux-vcpkg-vulkan
+```
+
+默认依赖包含：
+
+* `fmt`
+* `opencv4`
+* `ncnn`
+* `cpp-httplib`
+* `poco`
 
 ## 本系列项目
 
