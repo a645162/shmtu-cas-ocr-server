@@ -4,7 +4,7 @@
 
 ## 脚本列表
 
-### `run-server.sh`
+### `run_server.py`
 
 启动 `shmtu_cas_ocr_server`。
 
@@ -19,13 +19,13 @@
 示例：
 
 ```bash
-./scripts/run-server.sh
-./scripts/run-server.sh --workers 4 --queue-capacity 32
-SHMTU_HTTP_PORT=3000 SHMTU_TCP_PORT=3001 ./scripts/run-server.sh
-SHMTU_USE_GPU=0 ./scripts/run-server.sh
+python3 ./scripts/run_server.py
+python3 ./scripts/run_server.py --workers 4 --queue-capacity 32
+SHMTU_HTTP_PORT=3000 SHMTU_TCP_PORT=3001 python3 ./scripts/run_server.py
+SHMTU_USE_GPU=0 python3 ./scripts/run_server.py
 ```
 
-### `run-cli.sh`
+### `run_cli.py`
 
 启动 `shmtu_cas_ocr_cli`。
 
@@ -38,30 +38,38 @@ SHMTU_USE_GPU=0 ./scripts/run-server.sh
 示例：
 
 ```bash
-./scripts/run-cli.sh captcha.png
-./scripts/run-cli.sh --json ./captcha_images
-SHMTU_USE_GPU=0 ./scripts/run-cli.sh ./captcha_images
+python3 ./scripts/run_cli.py captcha.png
+python3 ./scripts/run_cli.py --json ./captcha_images
+SHMTU_USE_GPU=0 python3 ./scripts/run_cli.py ./captcha_images
 ```
 
-### `run-gui.sh`
+### `run_gui.py`
 
 启动 `shmtu_cas_ocr_gui`。
+
+默认参数：
+
+- `--model-dir ${PROJECT_ROOT}/models`
+- `--precision fp16`
+- 当 `SHMTU_USE_GPU=1` 时附加 `--use-gpu`
 
 示例：
 
 ```bash
-./scripts/run-gui.sh
+python3 ./scripts/run_gui.py
+SHMTU_MODEL_DIR=/opt/shmtu-models python3 ./scripts/run_gui.py
+SHMTU_PRECISION=fp32 SHMTU_USE_GPU=1 python3 ./scripts/run_gui.py
 ```
 
-### `run-lib-check.sh`
+### `run_lib_check.py`
 
 `shmtu-cas-ocr-lib` 是库目标，不是独立程序。这个脚本用于单独构建检查该库。
 
 示例：
 
 ```bash
-./scripts/run-lib-check.sh
-SHMTU_BUILD_PRESET=build-linux-vcpkg ./scripts/run-lib-check.sh
+python3 ./scripts/run_lib_check.py
+SHMTU_BUILD_PRESET=build-linux-vcpkg python3 ./scripts/run_lib_check.py
 ```
 
 ## 二进制查找规则
@@ -87,14 +95,14 @@ SHMTU_BUILD_PRESET=build-linux-vcpkg ./scripts/run-lib-check.sh
 - `SHMTU_USE_GPU`
   - `1` 表示启用 GPU，`0` 表示禁用 GPU。
 
-### 仅 `run-server.sh`
+### 仅 `run_server.py`
 
 - `SHMTU_HTTP_PORT`
   - HTTP 监听端口。
 - `SHMTU_TCP_PORT`
   - TCP 监听端口。
 
-### 仅 `run-lib-check.sh`
+### 仅 `run_lib_check.py`
 
 - `SHMTU_BUILD_PRESET`
   - 默认值为 `build-linux-vcpkg-vulkan`。

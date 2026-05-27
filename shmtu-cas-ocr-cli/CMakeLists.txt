@@ -7,10 +7,26 @@ project(shmtu-cas-ocr-cli VERSION ${PROJECT_VERSION} LANGUAGES CXX)
 # --------------------------------------------------------------------------
 find_package(fmt REQUIRED)
 
-# tclap is header-only; include from 3rdparty
+# cpp-httplib is header-only; include from 3rdparty
+include_directories(
+    ${CMAKE_SOURCE_DIR}/3rdparty/cpp-httplib
+)
+
+# Tclap is header-only; include from 3rdparty
 include_directories(
     ${CMAKE_SOURCE_DIR}/3rdparty/Tclap/tclap-1.4.0-rc1/include
 )
+
+# cpp-httplib requires threading
+find_package(Threads REQUIRED)
+
+# Optional: OpenSSL for HTTPS support in cpp-httplib
+find_package(OpenSSL QUIET)
+if(OpenSSL_FOUND)
+    message(STATUS "OpenSSL found — HTTPS support enabled in CLI HTTP client")
+else()
+    message(STATUS "OpenSSL not found — HTTPS support disabled in CLI HTTP client")
+endif()
 
 # --------------------------------------------------------------------------
 # Sources
@@ -28,7 +44,13 @@ target_link_libraries(shmtu_cas_ocr_cli
     PRIVATE
         SHMTU::CasOcrLib
         fmt::fmt
+        Threads::Threads
 )
+
+if(OpenSSL_FOUND)
+    target_link_libraries(shmtu_cas_ocr_cli PRIVATE OpenSSL::SSL OpenSSL::Crypto)
+    target_compile_definitions(shmtu_cas_ocr_cli PRIVATE CPPHTTPLIB_OPENSSL_SUPPORT)
+endif()
 
 target_compile_features(shmtu_cas_ocr_cli PRIVATE cxx_std_20)
 

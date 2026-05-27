@@ -103,7 +103,7 @@ HealthResult OcrServer::health() const {
         health.availability_level = 1;
         health.reason = "High load";
     } else {
-        health.status = "ok";
+        health.status = "healthy";
         health.availability_level = 2;
     }
 

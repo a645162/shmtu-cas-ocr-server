@@ -3,6 +3,9 @@
   <component name="AutoImportSettings">
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
+  <component name="BackendCodeEditorMiscSettings">
+    <option name="/Default/Housekeeping/FeatureSuggestion/FeatureSuggestionManager/DisabledSuggesters/=SwitchToGoToActionSuggester/@EntryIndexedValue" value="true" type="bool" />
+  </component>
   <component name="CMakePresetLoader">{
   &quot;useNewFormat&quot;: true
 }</component>
@@ -19,19 +22,48 @@
     </configurations>
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="a82aa7ad-7fdc-4191-85b9-3f860c873848" name="更改" comment="" />
+    <list default="true" id="a82aa7ad-7fdc-4191-85b9-3f860c873848" name="更改" comment="">
+      <change beforePath="$PROJECT_DIR$/README.md" beforeDir="false" afterPath="$PROJECT_DIR$/README.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/scripts/README.md" beforeDir="false" afterPath="$PROJECT_DIR$/scripts/README.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/scripts/run-cli.sh" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/scripts/run-gui.sh" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/scripts/run-lib-check.sh" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/scripts/run-server.sh" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/shmtu-cas-ocr-cli/CMakeLists.txt" beforeDir="false" afterPath="$PROJECT_DIR$/shmtu-cas-ocr-cli/CMakeLists.txt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/shmtu-cas-ocr-cli/src/main.cpp" beforeDir="false" afterPath="$PROJECT_DIR$/shmtu-cas-ocr-cli/src/main.cpp" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/shmtu-cas-ocr-gui/CMakeLists.txt" beforeDir="false" afterPath="$PROJECT_DIR$/shmtu-cas-ocr-gui/CMakeLists.txt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/shmtu-cas-ocr-gui/src/main.cpp" beforeDir="false" afterPath="$PROJECT_DIR$/shmtu-cas-ocr-gui/src/main.cpp" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/shmtu-cas-ocr-server/src/server.cpp" beforeDir="false" afterPath="$PROJECT_DIR$/shmtu-cas-ocr-server/src/server.cpp" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/shmtu-cas-ocr-server/src/server_http.cpp" beforeDir="false" afterPath="$PROJECT_DIR$/shmtu-cas-ocr-server/src/server_http.cpp" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/shmtu-cas-ocr-server/src/server_tcp.cpp" beforeDir="false" afterPath="$PROJECT_DIR$/shmtu-cas-ocr-server/src/server_tcp.cpp" afterDir="false" />
+    </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
     <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
     <option name="LAST_RESOLUTION" value="IGNORE" />
   </component>
+  <component name="ClangdSettings">
+    <option name="formatViaClangd" value="false" />
+  </component>
   <component name="ExecutionTargetManager" SELECTED_TARGET="CMakeBuildProfile:Release" />
   <component name="Git.Settings">
     <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
   </component>
+  <component name="GitHubPullRequestSearchHistory"><![CDATA[{
+  "lastFilter": {
+    "state": "OPEN",
+    "assignee": "a645162"
+  }
+}]]></component>
   <component name="GitToolBoxStore">
     <option name="projectConfigVersion" value="5" />
   </component>
+  <component name="GithubPullRequestsUISettings"><![CDATA[{
+  "selectedUrlAndAccountId": {
+    "url": "https://github.com/a645162/shmtu-cas-ocr-server.git",
+    "accountId": "46a57720-7855-4ca8-960a-1fb643df86df"
+  }
+}]]></component>
   <component name="ProjectApplicationVersion">
     <option name="ide" value="CLion" />
     <option name="majorVersion" value="2024" />
@@ -49,14 +81,20 @@
   <component name="PropertiesComponent"><![CDATA[{
   "keyToString": {
     "CMake 应用程序.SHMTU_CAS_Server.executor": "Run",
+    "RunOnceActivity.RadMigrateCodeStyle": "true",
     "RunOnceActivity.ShowReadmeOnStart": "true",
     "RunOnceActivity.cidr.known.project.marker": "true",
+    "RunOnceActivity.git.unshallow": "true",
     "RunOnceActivity.readMode.enableVisualFormatting": "true",
+    "RunOnceActivity.typescript.service.memoryLimit.init": "true",
+    "cf.first.check.clang-format": "false",
     "cidr.known.project.marker": "true",
+    "codeWithMe.voiceChat.enabledByDefault": "false",
     "git-widget-placeholder": "main",
     "ignore.virus.scanning.warn.message": "true",
-    "last_opened_file_path": "/Users/konghaomin/SHMTU/shmtu-cas-serial/shmtu-cas-ocr-server",
-    "settings.editor.selected.configurable": "CMakeSettings"
+    "last_opened_file_path": "/home/konghaomin/Prj/SHMTU/shmtu-terminal/Server/shmtu-cas-ocr-server",
+    "settings.editor.selected.configurable": "CMakeSettings",
+    "vue.rearranger.settings.migration": "true"
   }
 }]]></component>
   <component name="SpellCheckerSettings" RuntimeDictionaries="0" Folders="0" CustomDictionaries="0" DefaultDictionary="应用程序级" UseSingleDictionary="true" transferred="true" />
@@ -71,8 +109,12 @@
       <workItem from="1712118853851" duration="8691000" />
       <workItem from="1712132093077" duration="13000" />
       <workItem from="1712452492410" duration="7000" />
+      <workItem from="1779875083769" duration="1573000" />
     </task>
     <servers />
+  </component>
+  <component name="TypeScriptGeneratedFilesManager">
+    <option name="version" value="3" />
   </component>
   <component name="VCPKGProject">
     <isAutomaticCheckingOnLaunch value="false" />

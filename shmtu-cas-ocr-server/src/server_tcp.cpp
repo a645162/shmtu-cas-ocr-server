@@ -82,7 +82,7 @@ void start_tcp_server(OcrServer::Impl& impl) {
             auto result = impl.predict_sync(image_bytes, queued_ok);
             if (!queued_ok) {
                 impl.failed_requests.fetch_add(1);
-                conn->send("ERROR:OVERLOADED");
+                conn->send("");
                 conn->shutdown();
                 return;
             }
@@ -93,7 +93,7 @@ void start_tcp_server(OcrServer::Impl& impl) {
                 impl.failed_requests.fetch_add(1);
             }
 
-            conn->send(result.success ? result.expression : "ERROR:PREDICT_FAILED");
+            conn->send(result.success ? result.expression : "");
             conn->shutdown();
         });
 

@@ -88,10 +88,10 @@ $VCPKG_ROOT/vcpkg install --x-manifest-root=. --feature-flags=manifests --x-no-d
 
 `scripts/` 目录已经提供了常用运行脚本：
 
-* `scripts/run-server.sh`
-* `scripts/run-cli.sh`
-* `scripts/run-gui.sh`
-* `scripts/run-lib-check.sh`
+* `scripts/run_server.py`
+* `scripts/run_cli.py`
+* `scripts/run_gui.py`
+* `scripts/run_lib_check.py`
 
 详细说明见：
 

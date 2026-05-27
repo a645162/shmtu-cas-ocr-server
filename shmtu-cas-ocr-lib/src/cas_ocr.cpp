@@ -119,14 +119,15 @@ struct CasOcr::Impl {
     bool use_gpu;
     ModelStatus status = ModelStatus::NotLoaded;
 
-    // NCNN networks (each CasOcr instance owns its own)
-    ncnn::Net net_equal_symbol;
-    ncnn::Net net_operator;
-    ncnn::Net net_digit;
-
     // NCNN memory allocators (following Android version pattern)
     ncnn::UnlockedPoolAllocator blob_allocator;
     ncnn::PoolAllocator workspace_allocator;
+
+    // NCNN networks (each CasOcr instance owns its own)
+    // Keep nets after allocators so nets are destroyed first.
+    ncnn::Net net_equal_symbol;
+    ncnn::Net net_operator;
+    ncnn::Net net_digit;
 
     // Mutex for thread-safe inference (one inference at a time per instance)
     std::mutex inference_mutex;
@@ -308,6 +309,8 @@ struct CasOcr::Impl {
         net_equal_symbol.clear();
         net_operator.clear();
         net_digit.clear();
+        blob_allocator.clear();
+        workspace_allocator.clear();
         status = ModelStatus::NotLoaded;
     }
 };
