@@ -20,16 +20,57 @@ python3 3rdparty/NCNN/download_ncnn.py --tag 20260526 --ubuntu 2404
 
 当前工程在 Linux 下会自动优先探测 `3rdparty/NCNN/` 内最新的 `ncnn-*-ubuntu-*` 目录。
 
+## 当前结构
+
+当前仓库已经调整为多目标结构：
+
+* `shmtu-cas-ocr-lib`
+  * 纯 OCR 推理核心库
+* `shmtu-cas-ocr-server`
+  * `Drogon + Trantor` 服务端，同时提供 RESTful API 和 TCP 服务
+* `shmtu-cas-ocr-cli`
+  * 命令行工具
+* `shmtu-cas-ocr-gui`
+  * `wxWidgets` 桌面 GUI
+
+`server`、`cli`、`gui` 都依赖 `lib`，而不是把 Web 或 GUI 框架反向耦合到 OCR 核心库里。
+
 ## Build
-
-[Build构建指南](shmtu-cas-ocr-server/Build.md)
-
-**注意：**
-Windows下构建比较麻烦，建议使用Vcpkg或者不要使用Windows。
 
 当前仓库已切换为 `vcpkg manifest` 依赖管理，不再使用 Conan。
 
-Linux 下推荐流程：
+### 依赖栈
+
+当前 `vcpkg.json` 中的主要依赖为：
+
+* `fmt`
+* `opencv4`
+* `ncnn`
+* `drogon`
+* `trantor`
+* `wxwidgets`
+
+Vulkan 支持通过 manifest feature 启用：
+
+* `ncnn[vulkan]`
+
+### Ubuntu 系统依赖
+
+部分 Linux 桌面和构建工具依赖需要通过 `apt` 安装，请先阅读：
+
+* [Ubuntu vcpkg 系统依赖文档](Documents/docs/ubuntu-vcpkg-system-dependencies.md)
+
+### Linux 构建
+
+推荐使用 `CMakePresets.json`：
+
+```bash
+export VCPKG_ROOT=/path/to/vcpkg
+cmake --preset linux-vcpkg-vulkan
+cmake --build --preset build-linux-vcpkg-vulkan
+```
+
+如果暂时不启用 Vulkan：
 
 ```bash
 export VCPKG_ROOT=/path/to/vcpkg
@@ -37,22 +78,24 @@ cmake --preset linux-vcpkg
 cmake --build --preset build-linux-vcpkg
 ```
 
-如果要启用 Vulkan：
+如果你希望手动安装 manifest feature，也可以使用：
 
 ```bash
-export VCPKG_ROOT=/path/to/vcpkg
-vcpkg install --x-manifest-root=. --feature-flags=manifests --x-no-default-features --x-feature=vulkan
-cmake --preset linux-vcpkg-vulkan
-cmake --build --preset build-linux-vcpkg-vulkan
+$VCPKG_ROOT/vcpkg install --x-manifest-root=. --feature-flags=manifests --x-no-default-features --x-feature=vulkan
 ```
 
-默认依赖包含：
+## 运行脚本
 
-* `fmt`
-* `opencv4`
-* `ncnn`
-* `cpp-httplib`
-* `poco`
+`scripts/` 目录已经提供了常用运行脚本：
+
+* `scripts/run-server.sh`
+* `scripts/run-cli.sh`
+* `scripts/run-gui.sh`
+* `scripts/run-lib-check.sh`
+
+详细说明见：
+
+* [Scripts 使用说明](scripts/README.md)
 
 ## 本系列项目
 
