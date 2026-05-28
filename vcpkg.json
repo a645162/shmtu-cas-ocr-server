@@ -3,7 +3,16 @@
   "version-string": "1.0.0",
   "dependencies": [
     "fmt",
-    "opencv4",
+    {
+      "name": "opencv4",
+      "default-features": false,
+      "features": [
+        "jpeg",
+        "png",
+        "tiff",
+        "webp"
+      ]
+    },
     "ncnn",
     "drogon",
     "trantor"

@@ -4,7 +4,7 @@ message(STATUS "CMake version: ${CMAKE_VERSION}")
 # --------------------------------------------------------------------------
 # Project
 # --------------------------------------------------------------------------
-project(SHMTU_CAS_OCR VERSION 1.0.0 LANGUAGES CXX)
+project(shmtu-cas-cpp VERSION 1.0.0 LANGUAGES CXX)
 
 # --------------------------------------------------------------------------
 # Options
@@ -21,6 +21,7 @@ option(BUILD_SHARED_LIBS "Build shared libraries" OFF)
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
+set_property(GLOBAL PROPERTY USE_FOLDERS ON)
 
 # --------------------------------------------------------------------------
 # Version definition
@@ -37,13 +38,13 @@ message(STATUS "Build GUI:    ${BUILD_GUI}")
 message(STATUS "Use Vulkan:   ${USE_VULKAN}")
 
 set(SHMTU_CAN_BUILD_GUI FALSE)
-if(BUILD_GUI AND EXISTS "${CMAKE_SOURCE_DIR}/shmtu-cas-ocr-gui/CMakeLists.txt")
+if(BUILD_GUI AND EXISTS "${CMAKE_SOURCE_DIR}/ocr/shmtu-cas-ocr-gui/CMakeLists.txt")
     find_package(Qt6 QUIET COMPONENTS Widgets)
     if(Qt6Widgets_FOUND)
         set(SHMTU_CAN_BUILD_GUI TRUE)
         message(STATUS "Qt6 Widgets found: GUI target enabled")
     else()
-        message(STATUS "Qt6 Widgets not found: skipping shmtu-cas-ocr-gui")
+        message(STATUS "Qt6 Widgets not found: skipping ocr/shmtu-cas-ocr-gui")
     endif()
 endif()
 
@@ -83,16 +84,27 @@ endif()
 # --------------------------------------------------------------------------
 # Sub-projects
 # --------------------------------------------------------------------------
-add_subdirectory(shmtu-cas-ocr-lib)
+add_subdirectory(ocr/shmtu-cas-ocr-lib)
 
 if(BUILD_SERVER)
-    add_subdirectory(shmtu-cas-ocr-server)
+    add_subdirectory(ocr/shmtu-cas-ocr-server)
 endif()
 
 if(BUILD_CLI)
-    add_subdirectory(shmtu-cas-ocr-cli)
+    add_subdirectory(ocr/shmtu-cas-ocr-cli)
 endif()
 
 if(SHMTU_CAN_BUILD_GUI)
-    add_subdirectory(shmtu-cas-ocr-gui)
+    add_subdirectory(ocr/shmtu-cas-ocr-gui)
 endif()
+
+foreach(shmtu_ocr_target
+    shmtu_cas_ocr_lib
+    shmtu_cas_ocr_server
+    shmtu_cas_ocr_cli
+    shmtu_cas_ocr_gui
+)
+    if(TARGET ${shmtu_ocr_target})
+        set_property(TARGET ${shmtu_ocr_target} PROPERTY FOLDER "ocr")
+    endif()
+endforeach()

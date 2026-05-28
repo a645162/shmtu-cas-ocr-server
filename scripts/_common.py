@@ -27,7 +27,7 @@ def resolve_build_dir(binary_relpath: str) -> Path:
     candidates = []
     if build_dir_env:
         candidates.append(Path(build_dir_env))
-    if "shmtu-cas-ocr-gui/" in binary_relpath:
+    if "ocr/shmtu-cas-ocr-gui/" in binary_relpath:
         candidates.extend([DEFAULT_GUI_BUILD_DIR, FALLBACK_GUI_BUILD_DIR])
     candidates.extend([DEFAULT_BUILD_DIR, FALLBACK_BUILD_DIR])
 

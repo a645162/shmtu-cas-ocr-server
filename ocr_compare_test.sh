@@ -71,8 +71,8 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 if [[ -z "$SERVER_BIN" ]]; then
     # Try common locations relative to script
     for candidate in \
-        "$SCRIPT_DIR/build/shmtu-cas-ocr-server/shmtu_cas_ocr_server" \
-        "$SCRIPT_DIR/../build/shmtu-cas-ocr-server/shmtu_cas_ocr_server" \
+        "$SCRIPT_DIR/build/ocr/shmtu-cas-ocr-server/shmtu_cas_ocr_server" \
+        "$SCRIPT_DIR/../build/ocr/shmtu-cas-ocr-server/shmtu_cas_ocr_server" \
         "$(command -v shmtu_cas_ocr_server 2>/dev/null)"; do
         if [[ -x "$candidate" ]]; then
             SERVER_BIN="$candidate"
@@ -83,8 +83,8 @@ fi
 
 if [[ -z "$CLI_BIN" ]]; then
     for candidate in \
-        "$SCRIPT_DIR/build/shmtu-cas-ocr-cli/shmtu_cas_ocr_cli" \
-        "$SCRIPT_DIR/../build/shmtu-cas-ocr-cli/shmtu_cas_ocr_cli" \
+        "$SCRIPT_DIR/build/ocr/shmtu-cas-ocr-cli/shmtu_cas_ocr_cli" \
+        "$SCRIPT_DIR/../build/ocr/shmtu-cas-ocr-cli/shmtu_cas_ocr_cli" \
         "$(command -v shmtu_cas_ocr_cli 2>/dev/null)"; do
         if [[ -x "$candidate" ]]; then
             CLI_BIN="$candidate"

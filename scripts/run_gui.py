@@ -14,7 +14,7 @@ def main() -> None:
     opts = parse_build_args()
     binary = build_target(
         target="shmtu_cas_ocr_gui",
-        binary_relpath="shmtu-cas-ocr-gui/shmtu_cas_ocr_gui",
+        binary_relpath="ocr/shmtu-cas-ocr-gui/shmtu_cas_ocr_gui",
         use_vulkan=opts["use_vulkan"],
         build_gui=True,
         skip_build=opts["skip_build"],
