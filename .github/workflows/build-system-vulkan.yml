@@ -1,0 +1,46 @@
+name: Build System Vulkan
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+      - master
+  pull_request:
+
+jobs:
+  ubuntu-2404-system-vulkan:
+    runs-on: ubuntu-24.04
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install host tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            docker.io \
+            python3 \
+            ca-certificates
+
+      - name: Build server, CLI and runtime image via Docker
+        run: |
+          chmod +x scripts/docker_build_system_vulkan.sh
+          chmod +x scripts/ci_build_system_vulkan.sh
+          ./scripts/ci_build_system_vulkan.sh
+
+      - name: Export runtime image
+        run: |
+          docker save shmtu-cas-ocr-server:system-vulkan -o shmtu-cas-ocr-server-system-vulkan.tar
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ubuntu-2404-system-vulkan-artifacts
+          path: |
+            build/linux-system-vulkan/ocr/shmtu-cas-ocr-server/shmtu_cas_ocr_server
+            build/linux-system-vulkan/ocr/shmtu-cas-ocr-cli/shmtu_cas_ocr_cli
+            docker-runtime/shmtu_cas_ocr_server
+            docker-runtime/shmtu_cas_ocr_cli
+            shmtu-cas-ocr-server-system-vulkan.tar

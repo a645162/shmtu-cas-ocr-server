@@ -30,8 +30,24 @@
       }
     },
     {
+      "name": "linux-system",
+      "inherits": "base",
+      "cacheVariables": {
+        "USE_VULKAN": "OFF"
+      }
+    },
+    {
       "name": "linux-vcpkg-gui",
       "inherits": "linux-vcpkg",
+      "cacheVariables": {
+        "BUILD_SERVER": "OFF",
+        "BUILD_CLI": "OFF",
+        "BUILD_GUI": "ON"
+      }
+    },
+    {
+      "name": "linux-system-gui",
+      "inherits": "linux-system",
       "cacheVariables": {
         "BUILD_SERVER": "OFF",
         "BUILD_CLI": "OFF",
@@ -47,8 +63,24 @@
       }
     },
     {
+      "name": "linux-system-vulkan",
+      "inherits": "linux-system",
+      "cacheVariables": {
+        "USE_VULKAN": "ON"
+      }
+    },
+    {
       "name": "linux-vcpkg-vulkan-gui",
       "inherits": "linux-vcpkg-vulkan",
+      "cacheVariables": {
+        "BUILD_SERVER": "OFF",
+        "BUILD_CLI": "OFF",
+        "BUILD_GUI": "ON"
+      }
+    },
+    {
+      "name": "linux-system-vulkan-gui",
+      "inherits": "linux-system-vulkan",
       "cacheVariables": {
         "BUILD_SERVER": "OFF",
         "BUILD_CLI": "OFF",
@@ -66,12 +98,28 @@
       "configurePreset": "linux-vcpkg-gui"
     },
     {
+      "name": "build-linux-system",
+      "configurePreset": "linux-system"
+    },
+    {
+      "name": "build-linux-system-gui",
+      "configurePreset": "linux-system-gui"
+    },
+    {
       "name": "build-linux-vcpkg-vulkan",
       "configurePreset": "linux-vcpkg-vulkan"
     },
     {
+      "name": "build-linux-system-vulkan",
+      "configurePreset": "linux-system-vulkan"
+    },
+    {
       "name": "build-linux-vcpkg-vulkan-gui",
       "configurePreset": "linux-vcpkg-vulkan-gui"
+    },
+    {
+      "name": "build-linux-system-vulkan-gui",
+      "configurePreset": "linux-system-vulkan-gui"
     }
   ]
 }

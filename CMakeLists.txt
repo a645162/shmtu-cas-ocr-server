@@ -14,6 +14,17 @@ option(BUILD_CLI    "Build the CLI tool executable" ON)
 option(BUILD_GUI    "Build the GUI application" OFF)
 option(USE_VULKAN   "Enable Vulkan/GPU support via ncnn" OFF)
 option(BUILD_SHARED_LIBS "Build shared libraries" OFF)
+set(SHMTU_NCNN_ROOT "$ENV{SHMTU_NCNN_ROOT}" CACHE PATH "Path to an ncnn installation root or its CMake package directory")
+
+if((SHMTU_NCNN_ROOT OR (DEFINED ENV{NCNN_ROOT} AND NOT "$ENV{NCNN_ROOT}" STREQUAL "")) AND
+   DEFINED CMAKE_TOOLCHAIN_FILE AND
+   CMAKE_TOOLCHAIN_FILE MATCHES "vcpkg\\.cmake$")
+    message(FATAL_ERROR
+        "NCNN_ROOT/SHMTU_NCNN_ROOT is set while the vcpkg toolchain is enabled.\n"
+        "Use the linux-system* presets when providing a custom ncnn package, for example:\n"
+        "  cmake --preset linux-system-vulkan\n"
+        "  cmake --build --preset build-linux-system-vulkan")
+endif()
 
 # --------------------------------------------------------------------------
 # Global C++ standard
@@ -63,12 +74,44 @@ if(WIN32)
         set(ncnn_DIR     "${CMAKE_SOURCE_DIR}/3rdparty/NCNN/ncnn-vs2022-release/install/lib/cmake/ncnn")
     endif()
 elseif(CMAKE_SYSTEM_NAME MATCHES "Linux")
+    if(SHMTU_NCNN_ROOT)
+        set(SHMTU_NCNN_CANDIDATE_DIRS
+            "${SHMTU_NCNN_ROOT}"
+            "${SHMTU_NCNN_ROOT}/lib/cmake/ncnn"
+            "${SHMTU_NCNN_ROOT}/lib64/cmake/ncnn"
+            "${SHMTU_NCNN_ROOT}/share/ncnn"
+        )
+        foreach(shmtu_ncnn_candidate IN LISTS SHMTU_NCNN_CANDIDATE_DIRS)
+            if(EXISTS "${shmtu_ncnn_candidate}/ncnnConfig.cmake" OR
+               EXISTS "${shmtu_ncnn_candidate}/ncnn-config.cmake")
+                set(ncnn_DIR "${shmtu_ncnn_candidate}")
+                message(STATUS "Using ncnn package config from SHMTU_NCNN_ROOT: ${ncnn_DIR}")
+                break()
+            endif()
+        endforeach()
+    elseif(DEFINED ENV{NCNN_ROOT} AND NOT "$ENV{NCNN_ROOT}" STREQUAL "")
+        set(SHMTU_NCNN_CANDIDATE_DIRS
+            "$ENV{NCNN_ROOT}"
+            "$ENV{NCNN_ROOT}/lib/cmake/ncnn"
+            "$ENV{NCNN_ROOT}/lib64/cmake/ncnn"
+            "$ENV{NCNN_ROOT}/share/ncnn"
+        )
+        foreach(shmtu_ncnn_candidate IN LISTS SHMTU_NCNN_CANDIDATE_DIRS)
+            if(EXISTS "${shmtu_ncnn_candidate}/ncnnConfig.cmake" OR
+               EXISTS "${shmtu_ncnn_candidate}/ncnn-config.cmake")
+                set(ncnn_DIR "${shmtu_ncnn_candidate}")
+                message(STATUS "Using ncnn package config from NCNN_ROOT: ${ncnn_DIR}")
+                break()
+            endif()
+        endforeach()
+    endif()
+
     execute_process(
         COMMAND pacman --version
         RESULT_VARIABLE PACMAN_RESULT
         OUTPUT_QUIET ERROR_QUIET
     )
-    if(NOT PACMAN_RESULT EQUAL 0)
+    if(NOT PACMAN_RESULT EQUAL 0 AND NOT ncnn_DIR)
         file(GLOB SHMTU_LOCAL_NCNN_CMAKE_DIRS
             LIST_DIRECTORIES true
             "${CMAKE_SOURCE_DIR}/3rdparty/NCNN/ncnn-*-ubuntu-*/lib/cmake/ncnn"
@@ -77,6 +120,30 @@ elseif(CMAKE_SYSTEM_NAME MATCHES "Linux")
             list(SORT SHMTU_LOCAL_NCNN_CMAKE_DIRS ORDER DESCENDING)
             list(GET SHMTU_LOCAL_NCNN_CMAKE_DIRS 0 ncnn_DIR)
             message(STATUS "Using bundled ncnn package config from ${ncnn_DIR}")
+        endif()
+    endif()
+
+    # Ubuntu's Drogon package may ship a legacy FindMySQL.cmake that misses
+    # /usr/lib/x86_64-linux-gnu/libmysqlclient.so. Preseed the standard paths
+    # for non-vcpkg builds so find_package(Drogon) can resolve its dependency.
+    if(NOT (DEFINED CMAKE_TOOLCHAIN_FILE AND CMAKE_TOOLCHAIN_FILE MATCHES "vcpkg\\.cmake$"))
+        if(NOT MYSQL_INCLUDE_DIRS AND EXISTS "/usr/include/mysql/mysql.h")
+            set(MYSQL_INCLUDE_DIRS "/usr/include/mysql" CACHE PATH "MySQL include directory for Drogon system package" FORCE)
+        endif()
+        if(NOT MYSQL_LIBRARIES AND EXISTS "/usr/lib/x86_64-linux-gnu/libmysqlclient.so")
+            set(MYSQL_LIBRARIES "/usr/lib/x86_64-linux-gnu/libmysqlclient.so" CACHE FILEPATH "MySQL client library for Drogon system package" FORCE)
+        endif()
+        if(NOT BROTLI_INCLUDE_DIR AND EXISTS "/usr/include/brotli/decode.h")
+            set(BROTLI_INCLUDE_DIR "/usr/include" CACHE PATH "Brotli include directory for Drogon system package" FORCE)
+        endif()
+        if(NOT BROTLIDEC_LIBRARY AND EXISTS "/usr/lib/x86_64-linux-gnu/libbrotlidec.so")
+            set(BROTLIDEC_LIBRARY "/usr/lib/x86_64-linux-gnu/libbrotlidec.so" CACHE FILEPATH "Brotli decoder library for Drogon system package" FORCE)
+        endif()
+        if(NOT BROTLIENC_LIBRARY AND EXISTS "/usr/lib/x86_64-linux-gnu/libbrotlienc.so")
+            set(BROTLIENC_LIBRARY "/usr/lib/x86_64-linux-gnu/libbrotlienc.so" CACHE FILEPATH "Brotli encoder library for Drogon system package" FORCE)
+        endif()
+        if(NOT BROTLICOMMON_LIBRARY AND EXISTS "/usr/lib/x86_64-linux-gnu/libbrotlicommon.so")
+            set(BROTLICOMMON_LIBRARY "/usr/lib/x86_64-linux-gnu/libbrotlicommon.so" CACHE FILEPATH "Brotli common library for Drogon system package" FORCE)
         endif()
     endif()
 endif()

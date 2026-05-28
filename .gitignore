@@ -1,6 +1,8 @@
 # Vibe Coding
 .omc/
 
+docker-runtime/
+
 vcpkg_installed/ 
 
 /.vscode

@@ -13,6 +13,10 @@ DEFAULT_BUILD_DIR = PROJECT_ROOT / "build" / "linux-vcpkg-vulkan"
 DEFAULT_GUI_BUILD_DIR = PROJECT_ROOT / "build" / "linux-vcpkg-vulkan-gui"
 FALLBACK_BUILD_DIR = PROJECT_ROOT / "build" / "linux-vcpkg"
 FALLBACK_GUI_BUILD_DIR = PROJECT_ROOT / "build" / "linux-vcpkg-gui"
+DEFAULT_SYSTEM_BUILD_DIR = PROJECT_ROOT / "build" / "linux-system-vulkan"
+DEFAULT_SYSTEM_GUI_BUILD_DIR = PROJECT_ROOT / "build" / "linux-system-vulkan-gui"
+FALLBACK_SYSTEM_BUILD_DIR = PROJECT_ROOT / "build" / "linux-system"
+FALLBACK_SYSTEM_GUI_BUILD_DIR = PROJECT_ROOT / "build" / "linux-system-gui"
 
 
 def env_flag(name: str, default: bool = True) -> bool:
@@ -28,8 +32,18 @@ def resolve_build_dir(binary_relpath: str) -> Path:
     if build_dir_env:
         candidates.append(Path(build_dir_env))
     if "ocr/shmtu-cas-ocr-gui/" in binary_relpath:
-        candidates.extend([DEFAULT_GUI_BUILD_DIR, FALLBACK_GUI_BUILD_DIR])
-    candidates.extend([DEFAULT_BUILD_DIR, FALLBACK_BUILD_DIR])
+        candidates.extend([
+            DEFAULT_GUI_BUILD_DIR,
+            FALLBACK_GUI_BUILD_DIR,
+            DEFAULT_SYSTEM_GUI_BUILD_DIR,
+            FALLBACK_SYSTEM_GUI_BUILD_DIR,
+        ])
+    candidates.extend([
+        DEFAULT_BUILD_DIR,
+        FALLBACK_BUILD_DIR,
+        DEFAULT_SYSTEM_BUILD_DIR,
+        FALLBACK_SYSTEM_BUILD_DIR,
+    ])
 
     for candidate in candidates:
         binary = candidate / binary_relpath
@@ -56,6 +70,15 @@ def find_build_dirs() -> list[Path]:
     return dirs
 
 
+def should_use_vcpkg() -> bool:
+    if not env_flag("SHMTU_USE_VCPKG", default=True):
+        return False
+
+    vcpkg_root = os.environ.get("VCPKG_ROOT", str(Path.home() / "vcpkg"))
+    toolchain = Path(vcpkg_root) / "scripts" / "buildsystems" / "vcpkg.cmake"
+    return toolchain.is_file()
+
+
 def cmake_configure(
     build_dir: Path,
     build_server: bool = True,
@@ -64,27 +87,27 @@ def cmake_configure(
     use_vulkan: bool = False,
 ) -> int:
     """Run cmake configure. Returns 0 on success."""
-    vcpkg_root = os.environ.get("VCPKG_ROOT", str(Path.home() / "vcpkg"))
-    toolchain = Path(vcpkg_root) / "scripts" / "buildsystems" / "vcpkg.cmake"
+    cmd = ["cmake", "-B", str(build_dir)]
 
-    if not toolchain.is_file():
-        print(f"Error: vcpkg toolchain not found at {toolchain}")
-        print("Set VCPKG_ROOT environment variable or install vcpkg.")
-        return 1
+    if should_use_vcpkg():
+        vcpkg_root = os.environ.get("VCPKG_ROOT", str(Path.home() / "vcpkg"))
+        toolchain = Path(vcpkg_root) / "scripts" / "buildsystems" / "vcpkg.cmake"
+        cmd.extend([
+            f"-DCMAKE_TOOLCHAIN_FILE={toolchain}",
+            "-DVCPKG_MANIFEST_MODE=ON",
+            "-DVCPKG_FEATURE_FLAGS=manifests",
+            f"-DVCPKG_MANIFEST_FEATURES={'vulkan' if use_vulkan else ''}",
+        ])
+    else:
+        print("[cmake configure] Using system packages (no vcpkg toolchain)")
 
-    cmd = [
-        "cmake",
-        "-B", str(build_dir),
-        f"-DCMAKE_TOOLCHAIN_FILE={toolchain}",
-        "-DVCPKG_MANIFEST_MODE=ON",
-        "-DVCPKG_FEATURE_FLAGS=manifests",
-        f"-DVCPKG_MANIFEST_FEATURES={'vulkan' if use_vulkan else ''}",
+    cmd.extend([
         f"-DBUILD_SERVER={'ON' if build_server else 'OFF'}",
         f"-DBUILD_CLI={'ON' if build_cli else 'OFF'}",
         f"-DBUILD_GUI={'ON' if build_gui else 'OFF'}",
         f"-DUSE_VULKAN={'ON' if use_vulkan else 'OFF'}",
         str(PROJECT_ROOT),
-    ]
+    ])
 
     print(f"[cmake configure] {' '.join(cmd)}")
     result = subprocess.run(cmd, check=False)
@@ -133,9 +156,15 @@ def build_target(
     if build_dir_env:
         build_dir = Path(build_dir_env)
     elif build_gui:
-        build_dir = PROJECT_ROOT / "build" / ("linux-vcpkg-vulkan-gui" if use_vulkan else "linux-vcpkg-gui")
+        if should_use_vcpkg():
+            build_dir = PROJECT_ROOT / "build" / ("linux-vcpkg-vulkan-gui" if use_vulkan else "linux-vcpkg-gui")
+        else:
+            build_dir = PROJECT_ROOT / "build" / ("linux-system-vulkan-gui" if use_vulkan else "linux-system-gui")
     else:
-        build_dir = PROJECT_ROOT / "build" / ("linux-vcpkg-vulkan" if use_vulkan else "linux-vcpkg")
+        if should_use_vcpkg():
+            build_dir = PROJECT_ROOT / "build" / ("linux-vcpkg-vulkan" if use_vulkan else "linux-vcpkg")
+        else:
+            build_dir = PROJECT_ROOT / "build" / ("linux-system-vulkan" if use_vulkan else "linux-system")
 
     # Configure
     rc = cmake_configure(

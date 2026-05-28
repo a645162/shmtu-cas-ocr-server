@@ -1,11 +1,12 @@
-# Docker Vulkan 验证流程
+# Docker Vulkan 构建与运行流程
 
-本文档记录一次已经验证通过的流程：
+本文档记录当前推荐的两阶段流程：
 
-1. 宿主机构建 Vulkan 版 `server` / `cli`
-2. 将宿主机构建产物封装进 runtime Docker 镜像
-3. 运行容器并直通 Intel 核显 `/dev/dri`
-4. 用本地 `cli` 连接容器内服务端进行远程识别测试
+1. 先用 Docker builder 容器编译 Vulkan 版 `server` / `cli`
+2. 将 builder 产物复制回宿主机工作区
+3. 再用独立 runtime Docker 镜像封装这些产物
+4. 运行容器并直通 Intel 核显 `/dev/dri`
+5. 用本地 `cli` 连接容器内服务端进行远程识别测试
 
 这份流程用于快速验证：
 
@@ -13,99 +14,76 @@
 * 容器内是否能识别宿主机核显
 * 服务端是否能在 Docker 中正常提供 OCR 能力
 
-注意：本文档对应的是“运行时挂载宿主机 Vulkan/系统库”的验证方案，不是完全自包含的发布镜像方案。
+当前文档对应的是“builder 容器编译 + runtime 容器打包”的方案。它比之前的“直接挂宿主机库目录”更接近 CI 可复用流程。
 
 ## 前提条件
 
 宿主机需要满足：
 
 * Linux
-* `VCPKG_ROOT` 已配置
 * 已安装 Docker
-* 宿主机存在 `/dev/dri`
 * 模型文件已经放在项目 `models/` 目录中
 
 可先检查：
 
 ```bash
-echo "$VCPKG_ROOT"
 docker --version
 ls -l /dev/dri
 ```
 
-## 1. 宿主机构建 Vulkan 版 server / cli
+## 1. 用 Docker builder 编译 Vulkan 版 server / cli
 
-先使用 Vulkan preset 配置并构建：
+CI 和本地共用：
 
 ```bash
-export VCPKG_ROOT=/home/konghaomin/vcpkg
-
-cmake --preset linux-vcpkg-vulkan
-cmake --build --preset build-linux-vcpkg-vulkan --target shmtu_cas_ocr_server shmtu_cas_ocr_cli
+./scripts/ci_build_system_vulkan.sh
 ```
 
-成功后会生成：
+本地如果需要 `chsrc` 换源，使用：
+
+```bash
+./scripts/setup_local_system_vulkan.sh
+```
+
+执行完成后，产物会同时存在于：
 
 ```text
-build/linux-vcpkg-vulkan/ocr/shmtu-cas-ocr-server/shmtu_cas_ocr_server
-build/linux-vcpkg-vulkan/ocr/shmtu-cas-ocr-cli/shmtu_cas_ocr_cli
+build/linux-system-vulkan/ocr/shmtu-cas-ocr-server/shmtu_cas_ocr_server
+build/linux-system-vulkan/ocr/shmtu-cas-ocr-cli/shmtu_cas_ocr_cli
+docker-runtime/shmtu_cas_ocr_server
+docker-runtime/shmtu_cas_ocr_cli
 ```
 
-## 2. 准备 runtime 打包目录
+同时会生成 runtime 镜像：
 
-本仓库提供了 runtime-only Dockerfile：
-
-* [Dockerfile.runtime-host](/home/konghaomin/Prj/SHMTU/shmtu-terminal/Server/shmtu-cas-ocr-server/Dockerfile.runtime-host:1)
-
-将已构建的宿主机二进制复制到 `docker-runtime/`：
-
-```bash
-mkdir -p docker-runtime
-cp build/linux-vcpkg-vulkan/ocr/shmtu-cas-ocr-server/shmtu_cas_ocr_server docker-runtime/
-cp build/linux-vcpkg-vulkan/ocr/shmtu-cas-ocr-cli/shmtu_cas_ocr_cli docker-runtime/
+```text
+shmtu-cas-ocr-server:system-vulkan
 ```
 
-## 3. 构建 runtime 镜像
-
-```bash
-docker build -f Dockerfile.runtime-host -t shmtu-cas-ocr-server:gpu-host .
-```
-
-这一方案不会在容器里重新编译源码，只是打包宿主机已经构建好的二进制。
-
-## 4. 启动容器并直通核显
-
-运行时挂载：
-
-* `/dev/dri`
-* 宿主机模型目录
-* 宿主机 Vulkan / 系统库目录
+## 2. 启动 runtime 容器并直通核显
 
 示例命令：
 
 ```bash
 docker run -d \
-  --name shmtu-cas-ocr-gpu-test \
+  --name shmtu-cas-ocr-system-vulkan \
   -p 21620:21600 \
   -p 21621:21601 \
   --device /dev/dri:/dev/dri \
   -v /home/konghaomin/Prj/SHMTU/shmtu-terminal/Server/shmtu-cas-ocr-server/models:/app/models:ro \
-  -v /lib/x86_64-linux-gnu:/lib/x86_64-linux-gnu:ro \
-  -v /usr/lib/x86_64-linux-gnu:/usr/lib/x86_64-linux-gnu:ro \
-  -v /usr/share/vulkan:/usr/share/vulkan:ro \
-  shmtu-cas-ocr-server:gpu-host
+  shmtu-cas-ocr-server:system-vulkan
 ```
 
 说明：
 
 * 容器内服务端监听 `21600` / `21601`
 * 映射到宿主机后，对外测试端口为 `21620` / `21621`
-* 这里挂载宿主机库目录，是为了快速验证 Vulkan 运行链路
+* 这里仅需直通 `/dev/dri` 和挂载模型目录
 
-## 5. 检查容器日志
+## 3. 检查容器日志
 
 ```bash
-docker logs shmtu-cas-ocr-gpu-test
+docker logs shmtu-cas-ocr-system-vulkan
 ```
 
 如果 Vulkan 和核显都正常，日志中应出现类似内容：
@@ -122,7 +100,7 @@ Use GPU:        true
 
 如果没有 GPU，服务端代码会回退到 CPU，并打印 warning。
 
-## 6. 健康检查
+## 4. 健康检查
 
 ```bash
 curl -fsS http://127.0.0.1:21620/api/health
@@ -139,12 +117,12 @@ curl -fsS http://127.0.0.1:21620/api/health
 * `modelsLoaded: true` 表示模型已成功加载
 * `status: healthy` 表示服务端可以处理请求
 
-## 7. 用本地 CLI 测试远程识别
+## 5. 用本地 CLI 测试远程识别
 
 示例命令：
 
 ```bash
-build/linux-vcpkg-vulkan/ocr/shmtu-cas-ocr-cli/shmtu_cas_ocr_cli \
+build/linux-system-vulkan/ocr/shmtu-cas-ocr-cli/shmtu_cas_ocr_cli \
   --server 127.0.0.1:21620 \
   ./tmp/real-captcha-samples/captcha_01.png
 ```
@@ -164,41 +142,25 @@ Server health: OK
 * 本地 `cli` 已成功连通 Docker 内服务端
 * OCR 请求已由容器内服务端处理并返回
 
-## 8. 清理
+## 6. 清理
 
 停止并删除测试容器：
 
 ```bash
-docker rm -f shmtu-cas-ocr-gpu-test
+docker rm -f shmtu-cas-ocr-system-vulkan
 ```
 
 如果也要删除测试镜像：
 
 ```bash
-docker rmi shmtu-cas-ocr-server:gpu-host
+docker rmi shmtu-cas-ocr-server:system-vulkan
 ```
 
 ## 关键结论
 
 这次流程验证了以下几点：
 
-* 宿主机 Vulkan 版 `server` / `cli` 可成功构建
-* Docker 容器内可以通过 `/dev/dri` 识别 Intel 核显
-* 服务端可以在容器中完成模型加载并提供 HTTP OCR 服务
-* 本地 `cli` 可以远程连接并完成识别测试
-
-## 当前方案的限制
-
-当前 runtime 验证镜像不是完全自包含的，因为它依赖宿主机挂载：
-
-* `/lib/x86_64-linux-gnu`
-* `/usr/lib/x86_64-linux-gnu`
-* `/usr/share/vulkan`
-
-因此它适合：
-
-* 本机验证
-* 开发联调
-* 快速检查 Intel Vulkan 直通是否可用
-
-如果要做真正可分发的 GPU 镜像，建议后续再补一套“自包含运行时依赖打包”方案。
+* Docker builder 可以稳定产出 Ubuntu 24.04 system+Vulkan 二进制
+* builder 产物可以复制回宿主机工作区
+* runtime 镜像可以直接从这些产物构建
+* 运行时只需 `/dev/dri` 和模型目录即可验证 Intel Vulkan 直通

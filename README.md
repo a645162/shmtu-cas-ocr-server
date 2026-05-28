@@ -12,13 +12,13 @@ Ubuntu 下如果使用 Tencent 官方预编译版 ncnn，可运行：
 python3 3rdparty/NCNN/download_ncnn.py
 ```
 
-脚本会交互式要求选择 `Ubuntu 22.04` 或 `Ubuntu 24.04`，默认下载 `20260526` release，并解压到 `3rdparty/NCNN/`。如果需要指定版本，可使用：
+默认会下载 GitHub Release 最新版的 `Ubuntu 24.04` 预编译包，并解压到 `3rdparty/NCNN/`。如果需要交互式选择系统版本，可使用 `--interactive`。如果需要指定版本，可使用：
 
 ```bash
 python3 3rdparty/NCNN/download_ncnn.py --tag 20260526 --ubuntu 2404
 ```
 
-当前工程在 Linux 下会自动优先探测 `3rdparty/NCNN/` 内最新的 `ncnn-*-ubuntu-*` 目录。
+当前工程在 Linux 下会自动优先探测 `3rdparty/NCNN/` 内最新的 `ncnn-*-ubuntu-*` 目录，因此下载并解压后一般不需要额外设置路径。
 
 ## 当前结构
 
@@ -68,6 +68,59 @@ Vulkan 支持通过 manifest feature 启用：
 export VCPKG_ROOT=/path/to/vcpkg
 cmake --preset linux-vcpkg-vulkan
 cmake --build --preset build-linux-vcpkg-vulkan
+```
+
+如果 Ubuntu `apt` 已经安装好了依赖，并且你不想用 `vcpkg`，可以直接走系统包 preset：
+
+```bash
+python3 3rdparty/NCNN/download_ncnn.py
+cmake --preset linux-system-vulkan
+cmake --build --preset build-linux-system-vulkan
+```
+
+如果你想统一本地和 CI 的流程，仓库也提供了 Docker 化 system 构建链路：
+
+```bash
+./scripts/ci_build_system_vulkan.sh
+```
+
+它会执行：
+
+* 下载最新 Ubuntu 24.04 `ncnn` 预编译包
+* 构建 `Dockerfile.builder-system`
+* 在 builder 容器内编译 `server` / `cli`
+* 将产物复制回工作区 `build/linux-system-vulkan/` 和 `docker-runtime/`
+* 再用 [Dockerfile.runtime-system](/home/konghaomin/Prj/SHMTU/shmtu-terminal/Server/shmtu-cas-ocr-server/Dockerfile.runtime-system:1) 构建 runtime 镜像
+
+如果你在本地 Ubuntu 上遇到 `apt` 源较慢，使用本地 wrapper 即可。它和 CI 走同一套 Docker 构建脚本，只是在 builder 镜像内额外执行 `chsrc set ubuntu`：
+
+```bash
+./scripts/setup_local_system_vulkan.sh
+```
+
+如果你要构建 GUI：
+
+```bash
+cmake --preset linux-system-vulkan-gui
+cmake --build --preset build-linux-system-vulkan-gui
+```
+
+说明：
+
+* 这条路径不会使用 `vcpkg` toolchain
+* `OpenCV`、`fmt`、`Drogon`、`Trantor`、`Qt6`、`CURL`、`OpenSSL` 会优先由系统包提供
+* `libdrogon-dev` 在 Ubuntu 上还需要 `default-libmysqlclient-dev` 和 `libhiredis-dev`
+* `ncnn` 推荐使用 Tencent GitHub Release 的 Ubuntu 24.04 预编译包
+* 在 Linux 下当前工程会优先尝试 `SHMTU_NCNN_ROOT`、`NCNN_ROOT`、`3rdparty/NCNN/` 下的本地包
+* 如果显式设置了 `SHMTU_NCNN_ROOT` 或 `NCNN_ROOT`，请不要再使用 `linux-vcpkg*` preset；顶层 CMake 会直接报错并要求改用 `linux-system*`
+* Docker 化 system 构建的默认 builder 镜像名为 `shmtu-cas-ocr-builder:system-vulkan`，runtime 镜像名为 `shmtu-cas-ocr-server:system-vulkan`
+
+例如：
+
+```bash
+export NCNN_ROOT=/path/to/ncnn-install
+cmake --preset linux-system-vulkan
+cmake --build --preset build-linux-system-vulkan
 ```
 
 如果暂时不启用 Vulkan：

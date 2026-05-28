@@ -1,20 +1,79 @@
-# Ubuntu System Dependencies for vcpkg Builds
+# Ubuntu System Dependencies
 
-This project now uses `vcpkg` for C/C++ package management, but several Linux
-system tools are still required by some upstream ports during dependency
-resolution and source builds.
+This project supports two Linux dependency paths:
 
-This document records the `apt` packages that were confirmed as necessary while
-bringing up the current stack:
+1. `vcpkg` for the full dependency stack
+2. Ubuntu `apt` for most libraries, plus a prebuilt Tencent `ncnn` package
+
+This document records the `apt` packages that are useful for both setups.
+
+These packages were confirmed as useful while bringing up the current stack:
 
 * `Drogon + Trantor`
 * `ncnn` with `Vulkan`
 * `OpenCV`
 * `Qt6`
 
-## Confirmed Required Packages
+## Recommended Ubuntu Packages
 
-Install these packages before running `cmake` with the `vcpkg` toolchain:
+If you want the “system packages + prebuilt ncnn” path, install:
+
+```bash
+sudo apt-get update
+sudo apt-get install -y \
+  build-essential \
+  cmake \
+  ninja-build \
+  pkg-config \
+  python3 \
+  ca-certificates \
+  libopencv-dev \
+  libfmt-dev \
+  libdrogon-dev \
+  libtrantor-dev \
+  libjsoncpp-dev \
+  default-libmysqlclient-dev \
+  libhiredis-dev \
+  libssl-dev \
+  libcurl4-openssl-dev \
+  qt6-base-dev \
+  libvulkan-dev \
+  vulkan-tools \
+  mesa-vulkan-drivers
+```
+
+Then download the prebuilt Ubuntu 24.04 `ncnn` package:
+
+```bash
+python3 3rdparty/NCNN/download_ncnn.py
+```
+
+Then configure and build:
+
+```bash
+cmake --preset linux-system-vulkan
+cmake --build --preset build-linux-system-vulkan
+```
+
+If you want local and CI to share the same build pipeline, prefer the Docker builder flow instead:
+
+```bash
+./scripts/ci_build_system_vulkan.sh
+```
+
+For local Ubuntu machines that need a faster apt mirror inside the builder image:
+
+```bash
+./scripts/setup_local_system_vulkan.sh
+```
+
+Notes:
+
+* `libdrogon-dev` on Ubuntu depends on the MySQL client development files being present at configure time
+* `libdrogon-dev` on Ubuntu also depends on `hiredis` development files being present at configure time
+* this project pre-seeds the standard Ubuntu MySQL include/library paths for the `linux-system*` presets to work around Drogon's legacy `FindMySQL.cmake`
+
+If you want the `vcpkg` path, install these extra system tools before running `cmake` with the `vcpkg` toolchain:
 
 ```bash
 sudo apt-get update

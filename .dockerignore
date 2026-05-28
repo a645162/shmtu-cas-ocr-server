@@ -10,7 +10,9 @@ vcpkg_installed/
 .omc/
 
 # Docker
-docker-runtime/
+!docker-runtime/
+!docker-runtime/shmtu_cas_ocr_server
+!docker-runtime/shmtu_cas_ocr_cli
 
 # IDE
 .idea/

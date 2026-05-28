@@ -1,0 +1,39 @@
+FROM ubuntu:24.04
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        libdrogon1t64 \
+        libtrantor1 \
+        libopencv-core406t64 \
+        libopencv-imgproc406t64 \
+        libopencv-imgcodecs406t64 \
+        libjsoncpp25 \
+        libyaml-cpp0.8 \
+        libssl3t64 \
+        libcurl4t64 \
+        libbrotli1 \
+        libhiredis1.1.0 \
+        libmysqlclient21 \
+        libpq5 \
+        libsqlite3-0 \
+        libuuid1 \
+        libvulkan1 \
+        mesa-vulkan-drivers \
+        libgomp1 \
+        ca-certificates \
+        curl \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN mkdir -p /opt/shmtu/bin /app/models
+
+WORKDIR /app
+
+COPY docker-runtime/shmtu_cas_ocr_server /opt/shmtu/bin/shmtu_cas_ocr_server
+COPY docker-runtime/shmtu_cas_ocr_cli /opt/shmtu/bin/shmtu_cas_ocr_cli
+
+EXPOSE 21600
+EXPOSE 21601
+
+ENTRYPOINT ["/opt/shmtu/bin/shmtu_cas_ocr_server"]
+CMD ["--model-dir", "/app/models", "--http-port", "21600", "--tcp-port", "21601", "--use-gpu"]
