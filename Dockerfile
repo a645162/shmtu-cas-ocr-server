@@ -1,12 +1,13 @@
 # ==========================================================================
 # SHMTU CAS OCR Server — Multi-stage Dockerfile (vcpkg manifest)
 # Targets:
-#   builder       — bootstrap vcpkg and compile
+#   builder-cpu   — CPU build
+#   builder-gpu   — Vulkan build
 #   runtime-cpu   — CPU runtime
 #   runtime-gpu   — Vulkan runtime
 # ==========================================================================
 
-FROM ubuntu:24.04 AS builder
+FROM ubuntu:24.04 AS builder-base
 
 ENV DEBIAN_FRONTEND=noninteractive
 ENV VCPKG_ROOT=/opt/vcpkg
@@ -28,12 +29,17 @@ RUN git clone https://github.com/microsoft/vcpkg.git ${VCPKG_ROOT} \
 WORKDIR /build
 COPY . .
 
-ARG VCPKG_MANIFEST_FEATURES=""
+FROM builder-base AS builder-cpu
 
 RUN cmake --preset linux-vcpkg \
-        -DVCPKG_MANIFEST_FEATURES=${VCPKG_MANIFEST_FEATURES} \
     && cmake --build --preset build-linux-vcpkg \
     && cmake --install build/linux-vcpkg --prefix /install
+
+FROM builder-base AS builder-gpu
+
+RUN cmake --preset linux-vcpkg-vulkan \
+    && cmake --build --preset build-linux-vcpkg-vulkan \
+    && cmake --install build/linux-vcpkg-vulkan --prefix /install
 
 FROM ubuntu:24.04 AS runtime-cpu
 
@@ -46,8 +52,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         curl \
     && rm -rf /var/lib/apt/lists/*
 
-COPY --from=builder /install /opt/shmtu
-COPY --from=builder /build/build/linux-vcpkg/vcpkg_installed /opt/shmtu/vcpkg_installed
+COPY --from=builder-cpu /install /opt/shmtu
+COPY --from=builder-cpu /build/build/linux-vcpkg/vcpkg_installed /opt/shmtu/vcpkg_installed
 
 RUN mkdir -p /app/models
 
@@ -72,8 +78,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         curl \
     && rm -rf /var/lib/apt/lists/*
 
-COPY --from=builder /install /opt/shmtu
-COPY --from=builder /build/build/linux-vcpkg/vcpkg_installed /opt/shmtu/vcpkg_installed
+COPY --from=builder-gpu /install /opt/shmtu
+COPY --from=builder-gpu /build/build/linux-vcpkg-vulkan/vcpkg_installed /opt/shmtu/vcpkg_installed
 
 RUN mkdir -p /app/models
 

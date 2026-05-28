@@ -28,15 +28,13 @@ services:
       start_period: 10s
 
   # ------------------------------------------------------------------
-  # GPU-enabled build (NVIDIA Vulkan)
+  # GPU-enabled build (Intel / Mesa Vulkan via /dev/dri passthrough)
   # Uncomment and use this instead of the CPU service above.
   # ------------------------------------------------------------------
   # shmtu-cas-ocr-server-gpu:
   #   build:
   #     context: .
   #     target: runtime-gpu
-  #     args:
-  #       BUILD_TARGET: gpu
   #   image: shmtu-cas-ocr-server:gpu
   #   container_name: shmtu-cas-ocr-server-gpu
   #   ports:
@@ -44,15 +42,10 @@ services:
   #     - "21601:21601"
   #   volumes:
   #     - ./models:/app/models:ro
+  #   devices:
+  #     - /dev/dri:/dev/dri
   #   environment:
-  #     - LD_LIBRARY_PATH=/usr/local/lib
-  #   deploy:
-  #     resources:
-  #       reservations:
-  #         devices:
-  #           - driver: nvidia
-  #             count: 1
-  #             capabilities: [gpu]
+  #     - LD_LIBRARY_PATH=/opt/shmtu/lib
   #   restart: unless-stopped
   #   healthcheck:
   #     test: ["CMD", "curl", "-f", "http://localhost:21600/api/health"]

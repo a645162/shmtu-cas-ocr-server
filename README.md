@@ -58,6 +58,7 @@ Vulkan 支持通过 manifest feature 启用：
 部分 Linux 桌面和构建工具依赖需要通过 `apt` 安装，请先阅读：
 
 * [Ubuntu vcpkg 系统依赖文档](Documents/docs/ubuntu-vcpkg-system-dependencies.md)
+* [Docker Vulkan 验证流程](Documents/docs/docker-vulkan-host-runtime.md)
 
 ### Linux 构建
 

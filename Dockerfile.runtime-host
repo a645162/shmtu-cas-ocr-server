@@ -1,0 +1,15 @@
+FROM ubuntu:24.04
+
+ENV DEBIAN_FRONTEND=noninteractive
+ENV LD_LIBRARY_PATH=/lib/x86_64-linux-gnu:/usr/lib/x86_64-linux-gnu
+
+WORKDIR /app
+
+COPY docker-runtime/shmtu_cas_ocr_server /opt/shmtu/bin/shmtu_cas_ocr_server
+COPY docker-runtime/shmtu_cas_ocr_cli /opt/shmtu/bin/shmtu_cas_ocr_cli
+
+EXPOSE 21600
+EXPOSE 21601
+
+ENTRYPOINT ["/opt/shmtu/bin/shmtu_cas_ocr_server"]
+CMD ["--model-dir", "/app/models", "--http-port", "21600", "--tcp-port", "21601", "--use-gpu"]
