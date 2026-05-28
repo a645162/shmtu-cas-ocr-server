@@ -9,6 +9,9 @@
   <component name="CMakePresetLoader">{
   &quot;useNewFormat&quot;: true
 }</component>
+  <component name="CMakeProjectFlavorService">
+    <option name="flavorId" value="CMakePlainProjectFlavor" />
+  </component>
   <component name="CMakeReloadState">
     <option name="reloaded" value="true" />
   </component>
@@ -19,23 +22,19 @@
     <configurations>
       <configuration PROFILE_NAME="Debug" ENABLED="true" CONFIG_NAME="Debug" />
       <configuration PROFILE_NAME="Release" ENABLED="true" CONFIG_NAME="Release" />
+      <configuration PROFILE_NAME="linux-vcpkg" ENABLED="false" FROM_PRESET="true" GENERATION_DIR="$PROJECT_DIR$/build/linux-vcpkg" />
+      <configuration PROFILE_NAME="linux-vcpkg-gui" ENABLED="false" FROM_PRESET="true" GENERATION_DIR="$PROJECT_DIR$/build/linux-vcpkg-gui" />
+      <configuration PROFILE_NAME="linux-vcpkg-vulkan" ENABLED="false" FROM_PRESET="true" GENERATION_DIR="$PROJECT_DIR$/build/linux-vcpkg-vulkan" />
+      <configuration PROFILE_NAME="linux-vcpkg-vulkan-gui" ENABLED="false" FROM_PRESET="true" GENERATION_DIR="$PROJECT_DIR$/build/linux-vcpkg-vulkan-gui" />
+      <configuration PROFILE_NAME="linux-vcpkg - build-linux-vcpkg" ENABLED="false" FROM_PRESET="true" GENERATION_DIR="$PROJECT_DIR$/build/linux-vcpkg" />
+      <configuration PROFILE_NAME="linux-vcpkg-gui - build-linux-vcpkg-gui" ENABLED="false" FROM_PRESET="true" GENERATION_DIR="$PROJECT_DIR$/build/linux-vcpkg-gui" />
+      <configuration PROFILE_NAME="linux-vcpkg-vulkan - build-linux-vcpkg-vulkan" ENABLED="false" FROM_PRESET="true" GENERATION_DIR="$PROJECT_DIR$/build/linux-vcpkg-vulkan" />
+      <configuration PROFILE_NAME="linux-vcpkg-vulkan-gui - build-linux-vcpkg-vulkan-gui" ENABLED="false" FROM_PRESET="true" GENERATION_DIR="$PROJECT_DIR$/build/linux-vcpkg-vulkan-gui" />
     </configurations>
   </component>
   <component name="ChangeListManager">
     <list default="true" id="a82aa7ad-7fdc-4191-85b9-3f860c873848" name="更改" comment="">
-      <change beforePath="$PROJECT_DIR$/README.md" beforeDir="false" afterPath="$PROJECT_DIR$/README.md" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/scripts/README.md" beforeDir="false" afterPath="$PROJECT_DIR$/scripts/README.md" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/scripts/run-cli.sh" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/scripts/run-gui.sh" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/scripts/run-lib-check.sh" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/scripts/run-server.sh" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/shmtu-cas-ocr-cli/CMakeLists.txt" beforeDir="false" afterPath="$PROJECT_DIR$/shmtu-cas-ocr-cli/CMakeLists.txt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/shmtu-cas-ocr-cli/src/main.cpp" beforeDir="false" afterPath="$PROJECT_DIR$/shmtu-cas-ocr-cli/src/main.cpp" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/shmtu-cas-ocr-gui/CMakeLists.txt" beforeDir="false" afterPath="$PROJECT_DIR$/shmtu-cas-ocr-gui/CMakeLists.txt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/shmtu-cas-ocr-gui/src/main.cpp" beforeDir="false" afterPath="$PROJECT_DIR$/shmtu-cas-ocr-gui/src/main.cpp" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/shmtu-cas-ocr-server/src/server.cpp" beforeDir="false" afterPath="$PROJECT_DIR$/shmtu-cas-ocr-server/src/server.cpp" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/shmtu-cas-ocr-server/src/server_http.cpp" beforeDir="false" afterPath="$PROJECT_DIR$/shmtu-cas-ocr-server/src/server_http.cpp" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/shmtu-cas-ocr-server/src/server_tcp.cpp" beforeDir="false" afterPath="$PROJECT_DIR$/shmtu-cas-ocr-server/src/server_tcp.cpp" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/shmtu-cas-ocr-gui/src/main_window.cpp" beforeDir="false" afterPath="$PROJECT_DIR$/shmtu-cas-ocr-gui/src/main_window.cpp" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -45,25 +44,51 @@
   <component name="ClangdSettings">
     <option name="formatViaClangd" value="false" />
   </component>
+  <component name="CopilotChats">
+    <option name="panelChat">
+      <chat>
+        <option name="activeSessionId" value="2922665e-25e2-444c-8ca9-d90dbcc4ac29" />
+        <option name="sessions">
+          <session>
+            <option name="chatType" value="PANEL" />
+            <option name="id" value="2922665e-25e2-444c-8ca9-d90dbcc4ac29" />
+            <option name="modeId" value="Ask" />
+            <option name="modelType" value="builtin_family" />
+            <option name="modelValue" value="auto" />
+            <option name="targetType" value="LOCAL" />
+          </session>
+        </option>
+        <option name="type" value="PANEL" />
+      </chat>
+    </option>
+  </component>
+  <component name="CopilotPersistence">
+    <persistenceIdMap>
+      <entry key="_/home/konghaomin/Prj/SHMTU/shmtu-terminal/Server/shmtu-cas-ocr-server" value="2eZbnYoIyq2PTMcTR57d5pjYbb5" />
+    </persistenceIdMap>
+  </component>
   <component name="ExecutionTargetManager" SELECTED_TARGET="CMakeBuildProfile:Release" />
   <component name="Git.Settings">
     <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
   </component>
-  <component name="GitHubPullRequestSearchHistory"><![CDATA[{
-  "lastFilter": {
-    "state": "OPEN",
-    "assignee": "a645162"
+  <component name="GitHubPullRequestSearchHistory">{
+  &quot;lastFilter&quot;: {
+    &quot;state&quot;: &quot;OPEN&quot;,
+    &quot;assignee&quot;: &quot;a645162&quot;
   }
-}]]></component>
+}</component>
   <component name="GitToolBoxStore">
     <option name="projectConfigVersion" value="5" />
   </component>
-  <component name="GithubPullRequestsUISettings"><![CDATA[{
-  "selectedUrlAndAccountId": {
-    "url": "https://github.com/a645162/shmtu-cas-ocr-server.git",
-    "accountId": "46a57720-7855-4ca8-960a-1fb643df86df"
+  <component name="GithubPullRequestsUISettings">{
+  &quot;selectedUrlAndAccountId&quot;: {
+    &quot;url&quot;: &quot;https://github.com/a645162/shmtu-cas-ocr-server.git&quot;,
+    &quot;accountId&quot;: &quot;46a57720-7855-4ca8-960a-1fb643df86df&quot;
   }
-}]]></component>
+}</component>
+  <component name="MacroExpansionManager">
+    <option name="directoryName" value="1sQYOqIp" />
+  </component>
   <component name="ProjectApplicationVersion">
     <option name="ide" value="CLion" />
     <option name="majorVersion" value="2024" />
@@ -87,6 +112,7 @@
     "RunOnceActivity.git.unshallow": "true",
     "RunOnceActivity.readMode.enableVisualFormatting": "true",
     "RunOnceActivity.typescript.service.memoryLimit.init": "true",
+    "RunOnceActivity.west.config.association.type.startup.service": "true",
     "cf.first.check.clang-format": "false",
     "cidr.known.project.marker": "true",
     "codeWithMe.voiceChat.enabledByDefault": "false",
@@ -97,6 +123,20 @@
     "vue.rearranger.settings.migration": "true"
   }
 }]]></component>
+  <component name="RunManager">
+    <configuration default="true" type="CMakeBoostTestRunConfigurationType" factoryName="Boost Test" REDIRECT_INPUT="false" ELEVATE="false" USE_EXTERNAL_CONSOLE="false" EMULATE_TERMINAL="false" PASS_PARENT_ENVS_2="true">
+      <method v="2" />
+    </configuration>
+    <configuration default="true" type="CMakeCatchTestRunConfigurationType" factoryName="Catch Test" REDIRECT_INPUT="false" ELEVATE="false" USE_EXTERNAL_CONSOLE="false" EMULATE_TERMINAL="false" PASS_PARENT_ENVS_2="true">
+      <method v="2" />
+    </configuration>
+    <configuration default="true" type="CMakeDoctestTestRunConfigurationType" factoryName="doctest Test" REDIRECT_INPUT="false" ELEVATE="false" USE_EXTERNAL_CONSOLE="false" EMULATE_TERMINAL="false" PASS_PARENT_ENVS_2="true">
+      <method v="2" />
+    </configuration>
+    <configuration default="true" type="CMakeGoogleTestRunConfigurationType" factoryName="Google Test" REDIRECT_INPUT="false" ELEVATE="false" USE_EXTERNAL_CONSOLE="false" EMULATE_TERMINAL="false" PASS_PARENT_ENVS_2="true">
+      <method v="2" />
+    </configuration>
+  </component>
   <component name="SpellCheckerSettings" RuntimeDictionaries="0" Folders="0" CustomDictionaries="0" DefaultDictionary="应用程序级" UseSingleDictionary="true" transferred="true" />
   <component name="TaskManager">
     <task active="true" id="Default" summary="默认任务">
@@ -110,6 +150,7 @@
       <workItem from="1712132093077" duration="13000" />
       <workItem from="1712452492410" duration="7000" />
       <workItem from="1779875083769" duration="1573000" />
+      <workItem from="1779954897378" duration="84000" />
     </task>
     <servers />
   </component>
@@ -120,5 +161,14 @@
     <isAutomaticCheckingOnLaunch value="false" />
     <isAutomaticFoundErrors value="true" />
     <isAutomaticReloadCMake value="true" />
+    <isAutomaticBootstrapAfterUpdate value="false" />
+  </component>
+  <component name="github-copilot-workspace">
+    <instructionFileLocations>
+      <option value=".github/instructions" />
+    </instructionFileLocations>
+    <promptFileLocations>
+      <option value=".github/prompts" />
+    </promptFileLocations>
   </component>
 </project>

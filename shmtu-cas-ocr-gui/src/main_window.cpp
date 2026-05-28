@@ -9,10 +9,11 @@
 #include <QAbstractItemView>
 #include <QCheckBox>
 #include <QComboBox>
+#include <QDateTime>
+#include <QFrame>
 #include <QFileDialog>
 #include <QFileInfo>
 #include <QFont>
-#include <QFrame>
 #include <QGroupBox>
 #include <QHBoxLayout>
 #include <QHeaderView>
@@ -27,6 +28,8 @@
 #include <QProgressDialog>
 #include <QPushButton>
 #include <QResizeEvent>
+#include <QScrollArea>
+#include <QSizePolicy>
 #include <QTableWidget>
 #include <QTableWidgetItem>
 #include <QToolButton>
@@ -44,13 +47,179 @@ namespace shmtu::cas_ocr::gui {
 namespace {
 
 constexpr auto APP_TITLE_CN = "海大验证码识别 - NCNN";
+constexpr auto COLOR_WINDOW_BG = "#f3f6fb";
+constexpr auto COLOR_CARD_BG = "#ffffff";
+constexpr auto COLOR_CARD_BORDER = "#d7e2f0";
+constexpr auto COLOR_INNER_BG = "#f8fbff";
+constexpr auto COLOR_TEXT = "#18212f";
+constexpr auto COLOR_DIM_TEXT = "#66758a";
+constexpr auto COLOR_ACCENT = "#0f6cbd";
+constexpr auto COLOR_ACCENT_HOVER = "#115ea3";
+constexpr auto COLOR_ACCENT_PRESSED = "#0c3b67";
 constexpr auto COLOR_SUCCESS = "#4CAF50";
 constexpr auto COLOR_ERROR = "#F44336";
-constexpr auto COLOR_TOP_BAR_BG = "#F5F5F5";
-constexpr auto COLOR_BOTTOM_BAR_BG = "#F5F5F5";
+constexpr auto COLOR_BADGE_IDLE = "#7b8797";
+constexpr auto COLOR_DISABLED_BG = "#edf2f8";
+constexpr auto COLOR_DISABLED_TEXT = "#94a3b8";
 
 QString qs(const char* text) {
     return QString::fromUtf8(text);
+}
+
+QString buildWindowStyleSheet() {
+    return QString::fromLatin1(R"(
+QMainWindow {
+    background: %1;
+}
+QWidget#card {
+    background: %2;
+    border: 1px solid %3;
+    border-radius: 10px;
+}
+QWidget#innerCard {
+    background: %4;
+    border: 1px solid %3;
+    border-radius: 8px;
+}
+QLabel#sectionLabel {
+    color: %5;
+    font-size: 13px;
+    font-weight: 600;
+}
+QLabel#statusTitle {
+    color: %6;
+    font-size: 11px;
+}
+QLabel#statusMessage {
+    color: %5;
+    font-size: 14px;
+    font-weight: 600;
+}
+QLabel#dimText {
+    color: %6;
+    font-size: 11px;
+}
+QLabel#statusBadge {
+    background: %7;
+    color: white;
+    border-radius: 12px;
+    padding: 4px 10px;
+    font-size: 12px;
+    font-weight: 600;
+}
+QLineEdit,
+QComboBox {
+    min-height: 34px;
+    padding: 0 10px;
+    border: 1px solid %3;
+    border-radius: 8px;
+    background: white;
+    color: %5;
+}
+QLineEdit:focus,
+QComboBox:focus {
+    border: 1px solid %7;
+}
+QLineEdit#resultExpr,
+QLineEdit#elapsedText {
+    border: none;
+    background: transparent;
+    padding: 0;
+}
+QLineEdit#resultExpr {
+    color: %7;
+}
+QLineEdit#resultExpr[error='true'] {
+    color: %10;
+}
+QPushButton {
+    min-height: 36px;
+    padding: 0 14px;
+    border-radius: 8px;
+    border: 1px solid %3;
+    background: white;
+    color: %5;
+}
+QPushButton:hover {
+    background: %4;
+}
+QPushButton:pressed {
+    background: #e8f0fb;
+}
+QPushButton[accent='true'] {
+    background: %7;
+    color: white;
+    border: 1px solid %7;
+}
+QPushButton[accent='true']:hover {
+    background: %8;
+    border-color: %8;
+}
+QPushButton[accent='true']:pressed {
+    background: %9;
+    border-color: %9;
+}
+QPushButton:disabled,
+QPushButton[accent='true']:disabled {
+    background: %11;
+    color: %12;
+    border-color: %11;
+}
+QToolButton {
+    min-height: 36px;
+    padding: 0 6px;
+    border: none;
+    color: %5;
+    font-size: 13px;
+    font-weight: 600;
+    text-align: left;
+}
+QToolButton:hover {
+    color: %7;
+}
+QProgressBar {
+    min-height: 6px;
+    max-height: 6px;
+    border: none;
+    border-radius: 3px;
+    background: #e7eef8;
+}
+QProgressBar::chunk {
+    border-radius: 3px;
+    background: %7;
+}
+QLabel#previewSurface {
+    background: transparent;
+    border: none;
+}
+QScrollArea {
+    background: transparent;
+    border: none;
+}
+QWidget#batchItemCard {
+    background: %4;
+    border: 1px solid %3;
+    border-radius: 8px;
+}
+QWidget#batchThumbCard {
+    background: white;
+    border: 1px solid %3;
+    border-radius: 4px;
+}
+QCheckBox {
+    color: %5;
+}
+QMenuBar {
+    background: %1;
+}
+QMenuBar::item:selected {
+    background: %4;
+    border-radius: 6px;
+}
+    )")
+        .arg(COLOR_WINDOW_BG, COLOR_CARD_BG, COLOR_CARD_BORDER, COLOR_INNER_BG, COLOR_TEXT,
+             COLOR_DIM_TEXT, COLOR_ACCENT, COLOR_ACCENT_HOVER, COLOR_ACCENT_PRESSED,
+             COLOR_ERROR, COLOR_DISABLED_BG, COLOR_DISABLED_TEXT);
 }
 
 bool isSupportedPrecision(const QString& precision) {
@@ -58,6 +227,7 @@ bool isSupportedPrecision(const QString& precision) {
 }
 
 void setSectionLabelFont(QLabel* label) {
+    label->setObjectName(QStringLiteral("sectionLabel"));
     QFont font = label->font();
     font.setBold(true);
     label->setFont(font);
@@ -72,11 +242,40 @@ void setResultFieldStyle(QLineEdit* edit, int point_size, bool bold) {
     edit->setFrame(false);
 }
 
-QFrame* createSeparator(QWidget* parent) {
-    auto* separator = new QFrame(parent);
-    separator->setFrameShape(QFrame::HLine);
-    separator->setFrameShadow(QFrame::Sunken);
-    return separator;
+QLabel* createDimLabel(const QString& text, QWidget* parent) {
+    auto* label = new QLabel(text, parent);
+    label->setObjectName(QStringLiteral("dimText"));
+    return label;
+}
+
+QFrame* createCard(QWidget* parent, const char* object_name = "card") {
+    auto* frame = new QFrame(parent);
+    frame->setObjectName(QString::fromLatin1(object_name));
+    return frame;
+}
+
+QVBoxLayout* createSectionCard(QWidget* parent, const QString& title) {
+    auto* section_card = createCard(parent, "innerCard");
+    auto* section_layout = new QVBoxLayout(section_card);
+    section_layout->setContentsMargins(12, 12, 12, 12);
+    section_layout->setSpacing(8);
+
+    auto* title_label = new QLabel(title, section_card);
+    setSectionLabelFont(title_label);
+    section_layout->addWidget(title_label);
+
+    auto* parent_layout = qobject_cast<QVBoxLayout*>(parent->layout());
+    if (parent_layout) {
+        parent_layout->addWidget(section_card);
+    }
+
+    return section_layout;
+}
+
+void setAccentButton(QPushButton* button) {
+    button->setProperty("accent", true);
+    button->style()->unpolish(button);
+    button->style()->polish(button);
 }
 
 }  // namespace
@@ -88,6 +287,7 @@ MainWindow::MainWindow(const LaunchOptions& launch_options)
     setWindowTitle(qs(APP_TITLE_CN));
     resize(980, 720);
     setMinimumSize(820, 600);
+    setStyleSheet(buildWindowStyleSheet());
 
     buildMenuBar();
     buildUi();
@@ -114,8 +314,8 @@ void MainWindow::buildMenuBar() {
 void MainWindow::buildUi() {
     auto* central = new QWidget(this);
     auto* root_layout = new QVBoxLayout(central);
-    root_layout->setContentsMargins(0, 0, 0, 0);
-    root_layout->setSpacing(0);
+    root_layout->setContentsMargins(12, 12, 12, 12);
+    root_layout->setSpacing(10);
 
     buildTopBar(root_layout);
     buildMainArea(root_layout);
@@ -125,40 +325,55 @@ void MainWindow::buildUi() {
 }
 
 void MainWindow::buildTopBar(QVBoxLayout* root_layout) {
-    top_bar_panel_ = new QWidget(this);
-    top_bar_panel_->setStyleSheet(QStringLiteral("background-color: %1;").arg(COLOR_TOP_BAR_BG));
+    top_bar_panel_ = createCard(this);
 
     auto* panel_layout = new QVBoxLayout(top_bar_panel_);
-    panel_layout->setContentsMargins(8, 8, 8, 8);
-
-    auto* group = new QGroupBox(qs("模型"), top_bar_panel_);
-    auto* group_layout = new QVBoxLayout(group);
+    panel_layout->setContentsMargins(12, 12, 12, 12);
+    panel_layout->setSpacing(8);
 
     auto* row_layout = new QHBoxLayout();
+    row_layout->setSpacing(8);
 
-    auto* model_dir_label = new QLabel(qs("模型目录："), group);
+    auto* model_dir_label = new QLabel(qs("模型目录："), top_bar_panel_);
     setSectionLabelFont(model_dir_label);
     row_layout->addWidget(model_dir_label);
 
-    model_dir_edit_ = new QLineEdit(QString::fromStdString(launch_options_.model_dir), group);
+    model_dir_edit_ = new QLineEdit(QString::fromStdString(launch_options_.model_dir), top_bar_panel_);
     model_dir_edit_->setMinimumWidth(520);
     row_layout->addWidget(model_dir_edit_, 1);
 
-    check_download_button_ = new QPushButton(qs("检查 / 下载模型"), group);
+    check_download_button_ = new QPushButton(qs("检查 / 下载模型"), top_bar_panel_);
     row_layout->addWidget(check_download_button_);
 
-    model_status_label_ = new QLabel(qs("模型未就绪"), group);
-    setSectionLabelFont(model_status_label_);
+    model_status_label_ = new QLabel(qs("模型未就绪"), top_bar_panel_);
+    model_status_label_->setObjectName(QStringLiteral("statusBadge"));
     row_layout->addWidget(model_status_label_);
 
-    group_layout->addLayout(row_layout);
+    panel_layout->addLayout(row_layout);
 
-    download_progress_bar_ = new QProgressBar(group);
+    auto* progress_card = createCard(top_bar_panel_, "innerCard");
+    auto* progress_layout = new QVBoxLayout(progress_card);
+    progress_layout->setContentsMargins(12, 10, 12, 10);
+    progress_layout->setSpacing(6);
+
+    auto* progress_title = new QLabel(qs("模型文件状态"), progress_card);
+    progress_title->setObjectName(QStringLiteral("statusTitle"));
+    progress_layout->addWidget(progress_title);
+
+    download_progress_bar_ = new QProgressBar(progress_card);
     download_progress_bar_->setRange(0, 100);
     download_progress_bar_->setValue(0);
-    group_layout->addWidget(download_progress_bar_);
+    download_progress_bar_->setTextVisible(false);
+    progress_layout->addWidget(download_progress_bar_);
 
-    panel_layout->addWidget(group);
+    auto* progress_hint = createDimLabel(
+        qs("缺少模型时可直接下载，已就绪时会自动尝试加载当前精度配置。"),
+        progress_card);
+    progress_hint->setWordWrap(true);
+    progress_layout->addWidget(progress_hint);
+
+    panel_layout->addWidget(progress_card);
+
     root_layout->addWidget(top_bar_panel_);
 
     connect(check_download_button_, &QPushButton::clicked, this,
@@ -168,10 +383,11 @@ void MainWindow::buildTopBar(QVBoxLayout* root_layout) {
 void MainWindow::buildMainArea(QVBoxLayout* root_layout) {
     main_panel_ = new QWidget(this);
     auto* main_layout = new QVBoxLayout(main_panel_);
-    main_layout->setContentsMargins(8, 8, 8, 8);
+    main_layout->setContentsMargins(0, 0, 0, 0);
+    main_layout->setSpacing(10);
 
     auto* grid_layout = new QHBoxLayout();
-    grid_layout->setSpacing(8);
+    grid_layout->setSpacing(10);
 
     buildLeftColumn(grid_layout);
     buildRightColumn(grid_layout);
@@ -183,120 +399,135 @@ void MainWindow::buildMainArea(QVBoxLayout* root_layout) {
 }
 
 void MainWindow::buildLeftColumn(QHBoxLayout* parent_layout) {
-    auto* left_panel = new QWidget(main_panel_);
+    auto* left_panel = createCard(main_panel_);
     auto* left_layout = new QVBoxLayout(left_panel);
-    left_layout->setContentsMargins(0, 0, 0, 0);
+    left_layout->setContentsMargins(12, 12, 12, 12);
+    left_layout->setSpacing(10);
 
-    auto* preview_group = new QGroupBox(qs("预览与结果"), left_panel);
-    auto* preview_layout = new QVBoxLayout(preview_group);
+    auto* preview_frame = createCard(left_panel, "innerCard");
+    auto* preview_layout = new QVBoxLayout(preview_frame);
+    preview_layout->setContentsMargins(4, 4, 4, 4);
 
-    preview_label_ = new QLabel(preview_group);
+    preview_label_ = new QLabel(preview_frame);
+    preview_label_->setObjectName(QStringLiteral("previewSurface"));
     preview_label_->setAlignment(Qt::AlignCenter);
-    preview_label_->setFrameStyle(QFrame::StyledPanel | QFrame::Sunken);
     preview_label_->setMinimumSize(480, 260);
     preview_label_->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
     preview_layout->addWidget(preview_label_, 1);
 
-    source_path_label_ = new QLabel(qs("未选择图片"), preview_group);
+    source_path_label_ = createDimLabel(qs("未选择图片"), left_panel);
+    source_path_label_->setTextInteractionFlags(Qt::TextSelectableByMouse);
+    source_path_label_->setWordWrap(false);
     QFont dim_font = source_path_label_->font();
     dim_font.setPointSize(dim_font.pointSize() - 1);
     source_path_label_->setFont(dim_font);
-    preview_layout->addWidget(source_path_label_);
+    source_path_label_->setContentsMargins(2, 0, 2, 0);
 
-    auto* result_group = new QGroupBox(qs("识别结果"), preview_group);
+    auto* result_group = createCard(left_panel, "innerCard");
     auto* result_layout = new QVBoxLayout(result_group);
+    result_layout->setContentsMargins(14, 10, 14, 10);
+    result_layout->setSpacing(2);
 
     result_expr_edit_ = new QLineEdit(qs("（暂无识别结果）"), result_group);
+    result_expr_edit_->setObjectName(QStringLiteral("resultExpr"));
     setResultFieldStyle(result_expr_edit_, 34, true);
-    result_layout->addWidget(result_expr_edit_);
+    result_expr_edit_->setReadOnly(true);
 
     elapsed_ms_edit_ = new QLineEdit(qs("用时：0.0 毫秒"), result_group);
+    elapsed_ms_edit_->setObjectName(QStringLiteral("elapsedText"));
     setResultFieldStyle(elapsed_ms_edit_, std::max(8, elapsed_ms_edit_->font().pointSize() - 1),
                         false);
+    elapsed_ms_edit_->setReadOnly(true);
+
+    result_layout->addWidget(createDimLabel(qs("识别结果"), result_group));
+    result_layout->addWidget(result_expr_edit_);
     result_layout->addWidget(elapsed_ms_edit_);
 
-    preview_layout->addWidget(result_group);
-    left_layout->addWidget(preview_group);
+    left_layout->addWidget(preview_frame, 1);
+    left_layout->addWidget(source_path_label_);
+    left_layout->addWidget(result_group);
     parent_layout->addWidget(left_panel, 1);
 }
 
 void MainWindow::buildRightColumn(QHBoxLayout* parent_layout) {
-    auto* right_panel = new QWidget(main_panel_);
+    auto* right_panel = createCard(main_panel_);
     right_panel->setMinimumWidth(240);
     right_panel->setMaximumWidth(260);
 
     auto* right_panel_layout = new QVBoxLayout(right_panel);
-    right_panel_layout->setContentsMargins(0, 0, 0, 0);
+    right_panel_layout->setContentsMargins(12, 12, 12, 12);
+    right_panel_layout->setSpacing(0);
 
-    auto* action_group = new QGroupBox(qs("操作"), right_panel);
-    auto* action_layout = new QVBoxLayout(action_group);
-    action_layout->addSpacing(8);
+    auto* action_scroll = new QScrollArea(right_panel);
+    action_scroll->setWidgetResizable(true);
+    action_scroll->setFrameShape(QFrame::NoFrame);
+    action_scroll->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+    action_scroll->setVerticalScrollBarPolicy(Qt::ScrollBarAsNeeded);
 
-    auto* get_image_label = new QLabel(qs("获取图片"), action_group);
-    setSectionLabelFont(get_image_label);
-    action_layout->addWidget(get_image_label);
-    action_layout->addSpacing(6);
+    auto* action_container = new QWidget(action_scroll);
+    auto* action_layout = new QVBoxLayout(action_container);
+    action_layout->setContentsMargins(0, 0, 0, 0);
+    action_layout->setSpacing(10);
+
+    auto* acquire_layout = createSectionCard(action_container, qs("获取图片"));
 
     captcha_url_edit_ = new QLineEdit(QStringLiteral("https://cas.shmtu.edu.cn/cas/captcha"),
-                                      action_group);
+                                      action_container);
     captcha_url_edit_->setPlaceholderText(qs("验证码 URL"));
-    action_layout->addWidget(captcha_url_edit_);
-    action_layout->addSpacing(6);
+    captcha_url_edit_->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
+    acquire_layout->addWidget(captcha_url_edit_);
 
-    download_captcha_button_ = new QPushButton(qs("下载验证码"), action_group);
-    download_captcha_button_->setMinimumWidth(220);
-    action_layout->addWidget(download_captcha_button_);
-    action_layout->addSpacing(4);
+    download_captcha_button_ = new QPushButton(qs("下载验证码"), action_container);
+    download_captcha_button_->setMinimumHeight(40);
+    download_captcha_button_->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
+    QFont action_button_font = download_captcha_button_->font();
+    action_button_font.setPointSize(16);
+    download_captcha_button_->setFont(action_button_font);
+    acquire_layout->addWidget(download_captcha_button_);
 
-    open_local_button_ = new QPushButton(qs("打开本地图片"), action_group);
-    open_local_button_->setMinimumWidth(220);
-    action_layout->addWidget(open_local_button_);
-    action_layout->addSpacing(8);
-    action_layout->addWidget(createSeparator(action_group));
-    action_layout->addSpacing(8);
+    open_local_button_ = new QPushButton(qs("打开本地图片"), action_container);
+    open_local_button_->setMinimumHeight(40);
+    open_local_button_->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
+    open_local_button_->setFont(action_button_font);
+    acquire_layout->addWidget(open_local_button_);
 
-    auto* recognize_label = new QLabel(qs("识别"), action_group);
-    setSectionLabelFont(recognize_label);
-    action_layout->addWidget(recognize_label);
-    action_layout->addSpacing(6);
+    auto* recognize_layout = createSectionCard(action_container, qs("识别"));
 
-    recognize_button_ = new QPushButton(qs("▶ OCR 识别"), action_group);
-    recognize_button_->setMinimumWidth(220);
-    recognize_button_->setMinimumHeight(50);
+    recognize_button_ = new QPushButton(qs("▶ OCR 识别"), action_container);
+    recognize_button_->setMinimumHeight(56);
+    recognize_button_->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
     QFont recognize_font = recognize_button_->font();
     recognize_font.setPointSize(20);
     recognize_font.setBold(true);
     recognize_button_->setFont(recognize_font);
-    action_layout->addWidget(recognize_button_);
-    action_layout->addSpacing(8);
-    action_layout->addWidget(createSeparator(action_group));
-    action_layout->addSpacing(8);
+    setAccentButton(recognize_button_);
+    recognize_layout->addWidget(recognize_button_);
 
-    auto* batch_label = new QLabel(qs("批量"), action_group);
-    setSectionLabelFont(batch_label);
-    action_layout->addWidget(batch_label);
-    action_layout->addSpacing(6);
+    auto* batch_layout = createSectionCard(action_container, qs("批量"));
 
-    add_to_batch_button_ = new QPushButton(qs("加入批量列表"), action_group);
-    add_to_batch_button_->setMinimumWidth(220);
-    action_layout->addWidget(add_to_batch_button_);
-    action_layout->addSpacing(8);
-    action_layout->addWidget(createSeparator(action_group));
-    action_layout->addSpacing(8);
+    add_to_batch_button_ = new QPushButton(qs("加入批量列表"), action_container);
+    add_to_batch_button_->setMinimumHeight(40);
+    add_to_batch_button_->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
+    batch_layout->addWidget(add_to_batch_button_);
 
-    release_model_button_ = new QPushButton(qs("释放模型"), action_group);
-    release_model_button_->setMinimumWidth(220);
-    action_layout->addWidget(release_model_button_);
+    auto* model_layout = createSectionCard(action_container, qs("模型"));
+
+    release_model_button_ = new QPushButton(qs("释放模型"), action_container);
+    release_model_button_->setMinimumHeight(40);
+    release_model_button_->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
+    model_layout->addWidget(release_model_button_);
     action_layout->addStretch(1);
 
-    auto* author_label = new QLabel(QStringLiteral("Author: Haomin Kong"), action_group);
+    auto* author_label = createDimLabel(QStringLiteral("Author: Haomin Kong"), action_container);
     QFont author_font = author_label->font();
     author_font.setPointSize(author_font.pointSize() - 2);
     author_label->setFont(author_font);
     author_label->setAlignment(Qt::AlignHCenter);
     action_layout->addWidget(author_label);
 
-    right_panel_layout->addWidget(action_group);
+    action_scroll->setWidget(action_container);
+    right_panel_layout->addWidget(action_scroll);
+
     parent_layout->addWidget(right_panel);
 
     connect(download_captcha_button_, &QPushButton::clicked, this,
@@ -312,30 +543,46 @@ void MainWindow::buildRightColumn(QHBoxLayout* parent_layout) {
 }
 
 void MainWindow::buildBottomBar(QVBoxLayout* root_layout) {
-    bottom_bar_panel_ = new QWidget(this);
-    bottom_bar_panel_->setStyleSheet(
-        QStringLiteral("background-color: %1;").arg(COLOR_BOTTOM_BAR_BG));
+    bottom_bar_panel_ = createCard(this);
 
     auto* bottom_layout = new QHBoxLayout(bottom_bar_panel_);
-    bottom_layout->setContentsMargins(8, 8, 8, 8);
+    bottom_layout->setContentsMargins(12, 12, 12, 12);
+    bottom_layout->setSpacing(12);
 
-    status_label_ = new QLabel(qs("等待操作"), bottom_bar_panel_);
-    bottom_layout->addWidget(status_label_, 1);
+    auto* status_block = new QWidget(bottom_bar_panel_);
+    auto* status_block_layout = new QVBoxLayout(status_block);
+    status_block_layout->setContentsMargins(0, 0, 0, 0);
+    status_block_layout->setSpacing(2);
 
-    bottom_layout->addWidget(new QLabel(qs("精度:"), bottom_bar_panel_));
+    auto* status_title = new QLabel(qs("状态"), status_block);
+    status_title->setObjectName(QStringLiteral("statusTitle"));
+    status_block_layout->addWidget(status_title);
 
-    precision_combo_ = new QComboBox(bottom_bar_panel_);
+    status_label_ = new QLabel(qs("等待操作"), status_block);
+    status_label_->setObjectName(QStringLiteral("statusMessage"));
+    status_block_layout->addWidget(status_label_);
+    bottom_layout->addWidget(status_block, 1);
+
+    auto* control_card = createCard(bottom_bar_panel_, "innerCard");
+    auto* control_layout = new QHBoxLayout(control_card);
+    control_layout->setContentsMargins(12, 8, 12, 8);
+    control_layout->setSpacing(12);
+
+    control_layout->addWidget(createDimLabel(qs("精度:"), control_card));
+
+    precision_combo_ = new QComboBox(control_card);
     precision_combo_->addItems({QStringLiteral("fp16"), QStringLiteral("fp32")});
     precision_combo_->setCurrentText(isSupportedPrecision(QString::fromStdString(
                                          launch_options_.precision))
                                          ? QString::fromStdString(launch_options_.precision)
                                          : QStringLiteral("fp16"));
-    bottom_layout->addWidget(precision_combo_);
-    bottom_layout->addSpacing(12);
+    control_layout->addWidget(precision_combo_);
 
-    use_gpu_checkbox_ = new QCheckBox(qs("GPU加速"), bottom_bar_panel_);
+    use_gpu_checkbox_ = new QCheckBox(qs("GPU加速"), control_card);
     use_gpu_checkbox_->setChecked(launch_options_.use_gpu);
-    bottom_layout->addWidget(use_gpu_checkbox_);
+    control_layout->addWidget(use_gpu_checkbox_);
+
+    bottom_layout->addWidget(control_card);
 
     root_layout->addWidget(bottom_bar_panel_);
 }
@@ -358,38 +605,39 @@ void MainWindow::buildBatchPane(QVBoxLayout* parent_layout) {
     auto* batch_content_layout = new QVBoxLayout(batch_content_widget_);
     batch_content_layout->setContentsMargins(0, 4, 0, 0);
 
-    auto* batch_group = new QGroupBox(qs("批量列表"), batch_content_widget_);
+    auto* batch_group = createCard(batch_content_widget_);
     auto* batch_group_layout = new QVBoxLayout(batch_group);
+    batch_group_layout->setContentsMargins(12, 12, 12, 12);
 
     auto* button_row = new QHBoxLayout();
     batch_select_button_ = new QPushButton(qs("选择多张本地图片..."), batch_group);
     button_row->addWidget(batch_select_button_);
 
     batch_recognize_button_ = new QPushButton(qs("批量识别"), batch_group);
+    setAccentButton(batch_recognize_button_);
     button_row->addWidget(batch_recognize_button_);
 
     batch_clear_button_ = new QPushButton(qs("清空列表"), batch_group);
     button_row->addWidget(batch_clear_button_);
 
-    batch_stats_label_ = new QLabel(qs("共 0 项 · 平均 0.0 毫秒"), batch_group);
+    batch_stats_label_ = createDimLabel(qs("共 0 项 · 平均 0.0 毫秒"), batch_group);
     button_row->addWidget(batch_stats_label_, 1);
     batch_group_layout->addLayout(button_row);
     batch_group_layout->addSpacing(4);
 
-    batch_table_ = new QTableWidget(0, 5, batch_group);
-    batch_table_->setSelectionBehavior(QAbstractItemView::SelectRows);
-    batch_table_->setSelectionMode(QAbstractItemView::SingleSelection);
-    batch_table_->setEditTriggers(QAbstractItemView::NoEditTriggers);
-    batch_table_->setHorizontalHeaderLabels(
-        {QStringLiteral("#"), qs("来源"), qs("结果"), qs("状态"), qs("耗时(ms)")});
-    batch_table_->horizontalHeader()->setStretchLastSection(false);
-    batch_table_->horizontalHeader()->setSectionResizeMode(1, QHeaderView::Stretch);
-    batch_table_->setColumnWidth(0, 36);
-    batch_table_->setColumnWidth(2, 160);
-    batch_table_->setColumnWidth(3, 80);
-    batch_table_->setColumnWidth(4, 90);
-    batch_table_->setMinimumHeight(220);
-    batch_group_layout->addWidget(batch_table_);
+    batch_scroll_area_ = new QScrollArea(batch_group);
+    batch_scroll_area_->setWidgetResizable(true);
+    batch_scroll_area_->setFrameShape(QFrame::NoFrame);
+    batch_scroll_area_->setMinimumHeight(220);
+
+    batch_list_widget_ = new QWidget(batch_scroll_area_);
+    batch_list_layout_ = new QVBoxLayout(batch_list_widget_);
+    batch_list_layout_->setContentsMargins(0, 0, 0, 0);
+    batch_list_layout_->setSpacing(6);
+    batch_list_layout_->addStretch(1);
+
+    batch_scroll_area_->setWidget(batch_list_widget_);
+    batch_group_layout->addWidget(batch_scroll_area_);
 
     batch_content_layout->addWidget(batch_group);
     wrapper_layout->addWidget(batch_content_widget_);
@@ -398,7 +646,6 @@ void MainWindow::buildBatchPane(QVBoxLayout* parent_layout) {
     connect(batch_toggle_button_, &QToolButton::toggled, this, [this](bool checked) {
         batch_toggle_button_->setArrowType(checked ? Qt::DownArrow : Qt::RightArrow);
         batch_content_widget_->setVisible(checked);
-        adjustSize();
     });
     connect(batch_select_button_, &QPushButton::clicked, this,
             [this]() { onBatchSelectFiles(); });
@@ -527,6 +774,9 @@ void MainWindow::onReleaseModel() {
 
 void MainWindow::updateModelStatusUi() {
     model_status_label_->setText(model_loaded_ ? qs("模型已就绪") : qs("模型未就绪"));
+    model_status_label_->setStyleSheet(QStringLiteral(
+        "QLabel#statusBadge { background: %1; color: white; border-radius: 12px; padding: 4px 10px; font-size: 12px; font-weight: 600; }")
+        .arg(model_loaded_ ? COLOR_SUCCESS : COLOR_BADGE_IDLE));
     recognize_button_->setEnabled(model_loaded_);
     add_to_batch_button_->setEnabled(model_loaded_);
     batch_recognize_button_->setEnabled(model_loaded_);
@@ -557,7 +807,11 @@ void MainWindow::onDownloadCaptcha() {
         return;
     }
 
-    const auto temp_file = std::filesystem::temp_directory_path() / "captcha_download.png";
+    const auto unique_name =
+        QStringLiteral("captcha_download_%1.png")
+            .arg(QDateTime::currentDateTime().toString(QStringLiteral("yyyyMMdd_HHmmss_zzz")));
+    const auto temp_file =
+        std::filesystem::temp_directory_path() / unique_name.toStdString();
     {
         std::ofstream ofs(temp_file, std::ios::binary);
         ofs.write(reinterpret_cast<const char*>(image_data.data()),
@@ -622,8 +876,9 @@ void MainWindow::onAddToBatch() {
 
     BatchItem item;
     item.file_path = current_image_path_;
-    item.source_name = QFileInfo(current_image_path_).fileName();
+    item.source_name = source_path_label_->text().trimmed();
     item.status = qs("待识别");
+    item.image_data = current_image_data_;
     batch_items_.push_back(std::move(item));
 
     refreshBatchTable();
@@ -643,7 +898,7 @@ void MainWindow::onBatchSelectFiles() {
     for (const auto& path : paths) {
         BatchItem item;
         item.file_path = path;
-        item.source_name = QFileInfo(path).fileName();
+        item.source_name = path;
         item.status = qs("待识别");
         batch_items_.push_back(std::move(item));
     }
@@ -670,7 +925,9 @@ void MainWindow::onBatchRecognize() {
         }
 
         const auto start = std::chrono::steady_clock::now();
-        const auto result = ocr_->predict(item.file_path.toStdString());
+        const auto result = item.image_data.empty()
+                                ? ocr_->predict(item.file_path.toStdString())
+                                : ocr_->predict(item.image_data);
         const auto end = std::chrono::steady_clock::now();
         item.elapsed_ms = std::chrono::duration<double, std::milli>(end - start).count();
 
@@ -696,28 +953,21 @@ void MainWindow::onBatchClear() {
 }
 
 void MainWindow::refreshBatchTable() {
-    batch_table_->setRowCount(static_cast<int>(batch_items_.size()));
-
-    for (int row = 0; row < static_cast<int>(batch_items_.size()); ++row) {
-        const auto& item = batch_items_[static_cast<size_t>(row)];
-        const QColor color = item.status == qs("成功")
-                                 ? QColor(COLOR_SUCCESS)
-                                 : item.status == qs("失败") ? QColor(COLOR_ERROR) : QColor();
-
-        auto set_item = [&](int column, const QString& text) {
-            auto* cell = new QTableWidgetItem(text);
-            if (color.isValid()) {
-                cell->setForeground(color);
-            }
-            batch_table_->setItem(row, column, cell);
-        };
-
-        set_item(0, QString::number(row + 1));
-        set_item(1, item.source_name);
-        set_item(2, item.result_expr);
-        set_item(3, item.status);
-        set_item(4, item.elapsed_ms > 0.0 ? QString::number(item.elapsed_ms, 'f', 1) : QString());
+    if (!batch_list_layout_) {
+        return;
     }
+
+    while (auto* item = batch_list_layout_->takeAt(0)) {
+        if (auto* widget = item->widget()) {
+            widget->deleteLater();
+        }
+        delete item;
+    }
+
+    for (const auto& item : batch_items_) {
+        batch_list_layout_->addWidget(createBatchItemCard(item, batch_list_widget_));
+    }
+    batch_list_layout_->addStretch(1);
 
     updateBatchStats();
 }
@@ -735,6 +985,76 @@ void MainWindow::updateBatchStats() {
     const double avg = recognized > 0 ? total_ms / recognized : 0.0;
     batch_stats_label_->setText(qs("共 ") + QString::number(batch_items_.size()) + qs(" 项 · 平均 ") +
                                 QString::number(avg, 'f', 1) + qs(" 毫秒"));
+}
+
+QWidget* MainWindow::createBatchItemCard(const BatchItem& item, QWidget* parent) {
+    auto* card = createCard(parent, "batchItemCard");
+    auto* card_layout = new QHBoxLayout(card);
+    card_layout->setContentsMargins(8, 8, 8, 8);
+    card_layout->setSpacing(10);
+
+    auto* thumb_card = createCard(card, "batchThumbCard");
+    thumb_card->setFixedSize(110, 44);
+    auto* thumb_layout = new QVBoxLayout(thumb_card);
+    thumb_layout->setContentsMargins(2, 2, 2, 2);
+
+    auto* thumb_label = new QLabel(thumb_card);
+    thumb_label->setAlignment(Qt::AlignCenter);
+    thumb_label->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
+
+    QPixmap pixmap;
+    if (!item.image_data.empty()) {
+        pixmap.loadFromData(reinterpret_cast<const uchar*>(item.image_data.data()),
+                            static_cast<uint>(item.image_data.size()));
+    } else if (!item.file_path.isEmpty()) {
+        pixmap.load(item.file_path);
+    }
+    if (!pixmap.isNull()) {
+        thumb_label->setPixmap(
+            pixmap.scaled(QSize(104, 40), Qt::KeepAspectRatio, Qt::SmoothTransformation));
+    }
+    thumb_layout->addWidget(thumb_label);
+    card_layout->addWidget(thumb_card);
+
+    auto* center_layout = new QVBoxLayout();
+    center_layout->setSpacing(2);
+
+    auto* source_label = createDimLabel(item.source_name, card);
+    source_label->setTextInteractionFlags(Qt::TextSelectableByMouse);
+    source_label->setWordWrap(false);
+    source_label->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Preferred);
+    center_layout->addWidget(source_label);
+
+    auto* expr_label = new QLabel(item.result_expr.isEmpty() ? qs("（待识别）") : item.result_expr, card);
+    QFont expr_font = expr_label->font();
+    expr_font.setPointSize(16);
+    expr_font.setBold(true);
+    expr_label->setFont(expr_font);
+    expr_label->setStyleSheet(QStringLiteral("color: %1;").arg(COLOR_TEXT));
+    center_layout->addWidget(expr_label);
+    card_layout->addLayout(center_layout, 1);
+
+    auto* right_layout = new QVBoxLayout();
+    right_layout->setSpacing(2);
+
+    auto* status_label = createDimLabel(item.status.isEmpty() ? qs("待识别") : item.status, card);
+    status_label->setAlignment(Qt::AlignRight);
+    if (item.status == qs("成功")) {
+        status_label->setStyleSheet(QStringLiteral("color: %1; font-size: 11px;").arg(COLOR_SUCCESS));
+    } else if (item.status == qs("失败")) {
+        status_label->setStyleSheet(QStringLiteral("color: %1; font-size: 11px;").arg(COLOR_ERROR));
+    }
+    right_layout->addWidget(status_label);
+
+    auto* elapsed_label = createDimLabel(
+        item.elapsed_ms > 0.0 ? QString::number(item.elapsed_ms, 'f', 1) + qs(" ms") : QString(),
+        card);
+    elapsed_label->setAlignment(Qt::AlignRight);
+    right_layout->addWidget(elapsed_label);
+
+    card_layout->addLayout(right_layout);
+
+    return card;
 }
 
 bool MainWindow::ensureModelLoaded() {
@@ -773,12 +1093,18 @@ void MainWindow::updatePreviewPixmap() {
 
 void MainWindow::displayResult(const PredictResult& result, double elapsed_ms) {
     if (result.success) {
+        result_expr_edit_->setProperty("error", false);
+        result_expr_edit_->style()->unpolish(result_expr_edit_);
+        result_expr_edit_->style()->polish(result_expr_edit_);
         result_expr_edit_->setText(QString::fromStdString(result.expression));
         elapsed_ms_edit_->setText(qs("用时：") + QString::number(elapsed_ms, 'f', 1) + qs(" 毫秒"));
         setStatusText(qs("识别成功"));
         return;
     }
 
+    result_expr_edit_->setProperty("error", true);
+    result_expr_edit_->style()->unpolish(result_expr_edit_);
+    result_expr_edit_->style()->polish(result_expr_edit_);
     result_expr_edit_->setText(QString::fromStdString(result.error));
     elapsed_ms_edit_->setText(qs("用时：") + QString::number(elapsed_ms, 'f', 1) + qs(" 毫秒"));
     setStatusText(qs("识别失败"));

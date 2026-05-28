@@ -19,7 +19,7 @@ class QLineEdit;
 class QPushButton;
 class QProgressBar;
 class QResizeEvent;
-class QTableWidget;
+class QScrollArea;
 class QToolButton;
 class QVBoxLayout;
 class QWidget;
@@ -46,6 +46,7 @@ private:
         QString result_expr;
         QString status;
         double elapsed_ms = 0.0;
+        std::vector<uint8_t> image_data;
     };
 
     void buildMenuBar();
@@ -74,6 +75,7 @@ private:
     void onBatchClear();
     void refreshBatchTable();
     void updateBatchStats();
+    QWidget* createBatchItemCard(const BatchItem& item, QWidget* parent);
 
     bool ensureModelLoaded();
     void displayImage(const QString& path);
@@ -121,7 +123,9 @@ private:
     QPushButton* batch_recognize_button_ = nullptr;
     QPushButton* batch_clear_button_ = nullptr;
     QLabel* batch_stats_label_ = nullptr;
-    QTableWidget* batch_table_ = nullptr;
+    QScrollArea* batch_scroll_area_ = nullptr;
+    QWidget* batch_list_widget_ = nullptr;
+    QVBoxLayout* batch_list_layout_ = nullptr;
 };
 
 }  // namespace shmtu::cas_ocr::gui
