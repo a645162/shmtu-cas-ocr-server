@@ -1,6 +1,7 @@
 #include <shmtu/cas_ocr/gui/main_window.h>
 
 #include <shmtu/cas_ocr/cas_ocr.h>
+#include <shmtu/cas_ocr/gui/image_view.h>
 #include <shmtu/cas_ocr/gui/launch_options.h>
 #include <shmtu/cas_ocr/gui/logging.h>
 #include <shmtu/cas_ocr/gui/model_download.h>
@@ -20,10 +21,10 @@
 #include <QLabel>
 #include <QLineEdit>
 #include <QColor>
+#include <QFontMetrics>
 #include <QMenu>
 #include <QMenuBar>
 #include <QMessageBox>
-#include <QPixmap>
 #include <QProgressBar>
 #include <QProgressDialog>
 #include <QPushButton>
@@ -41,6 +42,7 @@
 #include <filesystem>
 #include <fstream>
 #include <memory>
+#include <sstream>
 #include <string>
 
 namespace shmtu::cas::ocr::gui {
@@ -64,6 +66,10 @@ constexpr auto COLOR_DISABLED_TEXT = "#94a3b8";
 
 QString qs(const char* text) {
     return QString::fromUtf8(text);
+}
+
+std::string boolToString(const bool value) {
+    return value ? "true" : "false";
 }
 
 QString buildWindowStyleSheet() {
@@ -188,7 +194,7 @@ QProgressBar::chunk {
     border-radius: 3px;
     background: %7;
 }
-QLabel#previewSurface {
+QWidget#previewSurface {
     background: transparent;
     border: none;
 }
@@ -299,8 +305,7 @@ void setAccentButton(QPushButton* button) {
 
 MainWindow::MainWindow(const LaunchOptions& launch_options)
     : launch_options_(launch_options),
-      ocr_(std::make_unique<shmtu::cas::ocr::CasOcr>()),
-      preview_pixmap_(std::make_unique<QPixmap>()) {
+      ocr_(std::make_unique<shmtu::cas::ocr::CasOcr>()) {
     setWindowTitle(qs(APP_TITLE_CN));
     resize(980, 720);
     setMinimumSize(820, 600);
@@ -309,13 +314,22 @@ MainWindow::MainWindow(const LaunchOptions& launch_options)
     buildMenuBar();
     buildUi();
     updateModelStatusUi();
+    updateResultTextLayout();
+    {
+        std::ostringstream oss;
+        oss << "MainWindow: initialized"
+            << ", model_dir=" << launch_options_.model_dir
+            << ", precision=" << launch_options_.precision
+            << ", use_gpu=" << boolToString(launch_options_.use_gpu);
+        logMessage(oss.str());
+    }
 }
 
 MainWindow::~MainWindow() = default;
 
 void MainWindow::resizeEvent(QResizeEvent* event) {
     QMainWindow::resizeEvent(event);
-    updatePreviewPixmap();
+    updateResultTextLayout();
 }
 
 void MainWindow::buildMenuBar() {
@@ -444,12 +458,24 @@ void MainWindow::buildLeftColumn(QHBoxLayout* parent_layout) {
     auto* preview_layout = new QVBoxLayout(preview_frame);
     preview_layout->setContentsMargins(4, 4, 4, 4);
 
-    preview_label_ = new QLabel(preview_frame);
+    preview_label_ = new ImageView(preview_frame);
     preview_label_->setObjectName(QStringLiteral("previewSurface"));
-    preview_label_->setAlignment(Qt::AlignCenter);
-    preview_label_->setMinimumSize(480, 260);
     preview_label_->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
     preview_layout->addWidget(preview_label_, 1);
+
+    auto* preview_mode_row = new QHBoxLayout();
+    preview_mode_row->setContentsMargins(2, 0, 2, 0);
+    preview_mode_row->setSpacing(8);
+    preview_mode_row->addWidget(createDimLabel(qs("显示模式："), left_panel));
+
+    preview_mode_combo_ = new QComboBox(left_panel);
+    preview_mode_combo_->addItem(qs("自适应"), static_cast<int>(ImageView::DisplayMode::Fit));
+    preview_mode_combo_->addItem(qs("填满"), static_cast<int>(ImageView::DisplayMode::Fill));
+    preview_mode_combo_->addItem(qs("1:1"), static_cast<int>(ImageView::DisplayMode::Original));
+    preview_mode_combo_->addItem(qs("平铺"), static_cast<int>(ImageView::DisplayMode::Tile));
+    preview_mode_combo_->setCurrentIndex(0);
+    preview_mode_row->addWidget(preview_mode_combo_);
+    preview_mode_row->addStretch(1);
 
     source_path_label_ = createDimLabel(qs("未选择图片"), left_panel);
     source_path_label_->setTextInteractionFlags(Qt::TextSelectableByMouse);
@@ -468,21 +494,35 @@ void MainWindow::buildLeftColumn(QHBoxLayout* parent_layout) {
     result_expr_edit_->setObjectName(QStringLiteral("resultExpr"));
     setResultFieldStyle(result_expr_edit_, 34, true);
     result_expr_edit_->setReadOnly(true);
+    result_expr_edit_->setAlignment(Qt::AlignCenter);
 
     elapsed_ms_edit_ = new QLineEdit(qs("用时：0.0 毫秒"), result_group);
     elapsed_ms_edit_->setObjectName(QStringLiteral("elapsedText"));
     setResultFieldStyle(elapsed_ms_edit_, std::max(8, elapsed_ms_edit_->font().pointSize() - 1),
                         false);
     elapsed_ms_edit_->setReadOnly(true);
+    elapsed_ms_edit_->setAlignment(Qt::AlignCenter);
 
     result_layout->addWidget(createDimLabel(qs("识别结果"), result_group));
     result_layout->addWidget(result_expr_edit_);
     result_layout->addWidget(elapsed_ms_edit_);
 
     left_layout->addWidget(preview_frame, 1);
+    left_layout->addLayout(preview_mode_row);
     left_layout->addWidget(source_path_label_);
     left_layout->addWidget(result_group);
     parent_layout->addWidget(left_panel, 1);
+
+    connect(preview_mode_combo_, &QComboBox::currentIndexChanged, this, [this](const int index) {
+        if (index < 0) {
+            return;
+        }
+
+        const auto mode = static_cast<ImageView::DisplayMode>(
+            preview_mode_combo_->itemData(index).toInt());
+        preview_label_->setDisplayMode(mode);
+        logMessage("preview mode changed, index=" + std::to_string(index));
+    });
 }
 
 void MainWindow::buildRightColumn(QHBoxLayout* parent_layout) {
@@ -688,8 +728,18 @@ void MainWindow::onCheckDownloadModels() {
     const auto model_dir = model_dir_edit_->text().toStdString();
     const auto precision = precision_combo_->currentText().toStdString();
     const auto missing_files = missingModelFiles(model_dir, precision);
+    {
+        std::ostringstream oss;
+        oss << "onCheckDownloadModels: settings"
+            << ", model_dir=" << model_dir
+            << ", precision=" << precision
+            << ", use_gpu=" << boolToString(use_gpu_checkbox_->isChecked())
+            << ", missing_count=" << missing_files.size();
+        logMessage(oss.str());
+    }
 
     if (missing_files.empty()) {
+        logMessage("onCheckDownloadModels: all model files present, loading directly");
         setStatusText(qs("所有模型文件已就绪，正在加载模型..."));
         loadModelFromCurrentSettings();
         return;
@@ -704,13 +754,22 @@ void MainWindow::onCheckDownloadModels() {
     const auto answer = QMessageBox::question(this, qs("下载模型"), message,
                                               QMessageBox::Yes | QMessageBox::No);
     if (answer != QMessageBox::Yes) {
+        logMessage("onCheckDownloadModels: user cancelled model download");
         return;
     }
 
+    logMessage("onCheckDownloadModels: user accepted model download");
     startModelDownload(missing_files, true);
 }
 
 void MainWindow::startModelDownload(const std::vector<std::string>& missing_files, bool use_gitee) {
+    {
+        std::ostringstream oss;
+        oss << "startModelDownload: begin"
+            << ", missing_count=" << missing_files.size()
+            << ", use_gitee=" << boolToString(use_gitee);
+        logMessage(oss.str());
+    }
     download_active_ = true;
     check_download_button_->setEnabled(false);
     download_progress_bar_->setValue(0);
@@ -737,6 +796,12 @@ void MainWindow::startModelDownload(const std::vector<std::string>& missing_file
             const int pct =
                 total_files > 0 ? static_cast<int>((completed_files * 100.0) / total_files) : 100;
             download_progress_bar_->setValue(pct);
+            if (!filename.empty()) {
+                logMessage("startModelDownload: progress, file=" + filename +
+                           ", completed=" + std::to_string(completed_files) +
+                           ", total=" + std::to_string(total_files) +
+                           ", progress=" + std::to_string(pct) + "%");
+            }
             QApplication::processEvents();
             return true;
         },
@@ -746,12 +811,14 @@ void MainWindow::startModelDownload(const std::vector<std::string>& missing_file
     check_download_button_->setEnabled(true);
 
     if (all_ok) {
+        logMessage("startModelDownload: all files downloaded successfully");
         download_progress_bar_->setValue(100);
         setStatusText(qs("模型下载完成，正在加载模型..."));
         loadModelFromCurrentSettings();
         return;
     }
 
+    logMessage("startModelDownload: download failed, error=" + error_message);
     download_progress_bar_->setValue(0);
     setStatusText(qs("模型下载失败"));
     QMessageBox::critical(this, qs("下载失败"),
@@ -762,9 +829,18 @@ void MainWindow::loadModelFromCurrentSettings() {
     const auto model_dir = model_dir_edit_->text().toStdString();
     const auto precision = precision_combo_->currentText().toStdString();
     const bool use_gpu = use_gpu_checkbox_->isChecked();
+    {
+        std::ostringstream oss;
+        oss << "loadModelFromCurrentSettings: begin"
+            << ", model_dir=" << model_dir
+            << ", precision=" << precision
+            << ", use_gpu=" << boolToString(use_gpu);
+        logMessage(oss.str());
+    }
 
     ocr_ = std::make_unique<shmtu::cas::ocr::CasOcr>(model_dir);
     if (!ocr_->load_model(precision.empty() ? "fp16" : precision, use_gpu)) {
+        logMessage("loadModelFromCurrentSettings: failed");
         model_loaded_ = false;
         updateModelStatusUi();
         setStatusText(qs("模型加载失败"));
@@ -775,12 +851,15 @@ void MainWindow::loadModelFromCurrentSettings() {
     }
 
     model_loaded_ = true;
+    logMessage("loadModelFromCurrentSettings: succeeded");
     updateModelStatusUi();
 }
 
 void MainWindow::onReleaseModel() {
+    logMessage("onReleaseModel: requested");
     if (ocr_) {
         ocr_->release();
+        logMessage("onReleaseModel: model released");
     }
     model_loaded_ = false;
     updateModelStatusUi();
@@ -792,13 +871,24 @@ void MainWindow::updateModelStatusUi() {
     model_status_label_->setStyleSheet(QStringLiteral(
         "QLabel#statusBadge { background: %1; color: white; border-radius: 12px; padding: 4px 10px; font-size: 12px; font-weight: 600; }")
         .arg(model_loaded_ ? COLOR_SUCCESS : COLOR_BADGE_IDLE));
+    precision_combo_->setEnabled(!model_loaded_);
+    use_gpu_checkbox_->setEnabled(!model_loaded_);
     recognize_button_->setEnabled(model_loaded_);
     add_to_batch_button_->setEnabled(model_loaded_);
     batch_recognize_button_->setEnabled(model_loaded_);
+    {
+        std::ostringstream oss;
+        oss << "updateModelStatusUi: applied"
+            << ", model_loaded=" << boolToString(model_loaded_)
+            << ", precision_enabled=" << boolToString(precision_combo_->isEnabled())
+            << ", gpu_enabled=" << boolToString(use_gpu_checkbox_->isEnabled());
+        logMessage(oss.str());
+    }
 }
 
 void MainWindow::onDownloadCaptcha() {
     const auto url = captcha_url_edit_->text().trimmed();
+    logMessage("onDownloadCaptcha: requested, url=" + url.toStdString());
     if (url.isEmpty()) {
         QMessageBox::warning(this, qs("下载验证码"), qs("请输入验证码 URL。"));
         return;
@@ -817,6 +907,16 @@ void MainWindow::onDownloadCaptcha() {
     std::vector<uint8_t> image_data;
     const bool ok = downloadUrlToMemory(url.toStdString(), image_data, http_status, error_message);
     if (!ok || http_status != 200 || image_data.empty()) {
+        std::ostringstream oss;
+        oss << "onDownloadCaptcha: failed"
+            << ", url=" << url.toStdString()
+            << ", ok=" << boolToString(ok)
+            << ", http_status=" << http_status
+            << ", bytes=" << image_data.size();
+        if (!error_message.empty()) {
+            oss << ", error=" << error_message;
+        }
+        logMessage(oss.str());
         setStatusText(qs("下载验证码失败"));
         QMessageBox::critical(this, qs("下载验证码"), qs("无法下载验证码图片，请检查 URL。"));
         return;
@@ -836,6 +936,13 @@ void MainWindow::onDownloadCaptcha() {
     current_image_path_ = QString::fromStdString(temp_file.string());
     current_image_source_name_ = unique_name + QStringLiteral("  |  ") + url;
     current_image_data_ = std::move(image_data);
+    {
+        std::ostringstream oss;
+        oss << "onDownloadCaptcha: succeeded"
+            << ", temp_file=" << current_image_path_.toStdString()
+            << ", bytes=" << current_image_data_.size();
+        logMessage(oss.str());
+    }
     displayImage(current_image_path_);
     source_path_label_->setText(url);
     setStatusText(qs("验证码下载成功"));
@@ -848,18 +955,21 @@ void MainWindow::onOpenLocalImage() {
         QString(),
         qs("图片文件 (*.png *.jpg *.jpeg *.bmp);;所有文件 (*.*)"));
     if (path.isEmpty()) {
+        logMessage("onOpenLocalImage: user cancelled file selection");
         return;
     }
 
     current_image_path_ = path;
     current_image_source_name_ = path;
     current_image_data_.clear();
+    logMessage("onOpenLocalImage: selected path=" + path.toStdString());
     displayImage(path);
     source_path_label_->setText(path);
     setStatusText(qs("已加载本地图片"));
 }
 
 void MainWindow::onOcrRecognize() {
+    logMessage("onOcrRecognize: requested");
     if (!ensureModelLoaded()) {
         return;
     }
@@ -874,18 +984,34 @@ void MainWindow::onOcrRecognize() {
     PredictResult result;
 
     if (!current_image_data_.empty()) {
+        logMessage("onOcrRecognize: using in-memory image data, bytes=" +
+                   std::to_string(current_image_data_.size()));
         result = ocr_->predict(current_image_data_);
     } else {
+        logMessage("onOcrRecognize: using image path=" + current_image_path_.toStdString());
         result = ocr_->predict(current_image_path_.toStdString());
     }
 
     const auto end = std::chrono::steady_clock::now();
     const auto elapsed_ms =
         std::chrono::duration<double, std::milli>(end - start).count();
+    {
+        std::ostringstream oss;
+        oss << "onOcrRecognize: finished"
+            << ", success=" << boolToString(result.success)
+            << ", elapsed_ms=" << elapsed_ms;
+        if (result.success) {
+            oss << ", expression=" << result.expression << ", result=" << result.result;
+        } else {
+            oss << ", error=" << result.error;
+        }
+        logMessage(oss.str());
+    }
     displayResult(result, elapsed_ms);
 }
 
 void MainWindow::onAddToBatch() {
+    logMessage("onAddToBatch: requested");
     if (current_image_path_.isEmpty()) {
         QMessageBox::warning(this, qs("批量"), qs("请先获取验证码图片。"));
         return;
@@ -898,6 +1024,15 @@ void MainWindow::onAddToBatch() {
                            : current_image_source_name_;
     item.status = qs("待识别");
     item.image_data = current_image_data_;
+    {
+        std::ostringstream oss;
+        oss << "onAddToBatch: add item"
+            << ", file_path=" << item.file_path.toStdString()
+            << ", source_name=" << item.source_name.toStdString()
+            << ", has_memory_data=" << boolToString(!item.image_data.empty())
+            << ", bytes=" << item.image_data.size();
+        logMessage(oss.str());
+    }
     batch_items_.push_back(std::move(item));
 
     refreshBatchTable();
@@ -911,8 +1046,11 @@ void MainWindow::onBatchSelectFiles() {
         QString(),
         qs("图片文件 (*.png *.jpg *.jpeg *.bmp);;所有文件 (*.*)"));
     if (paths.isEmpty()) {
+        logMessage("onBatchSelectFiles: user cancelled file selection");
         return;
     }
+
+    logMessage("onBatchSelectFiles: selected_count=" + std::to_string(paths.size()));
 
     for (const auto& path : paths) {
         BatchItem item;
@@ -920,6 +1058,7 @@ void MainWindow::onBatchSelectFiles() {
         item.source_name = path;
         item.status = qs("待识别");
         batch_items_.push_back(std::move(item));
+        logMessage("onBatchSelectFiles: appended path=" + path.toStdString());
     }
 
     refreshBatchTable();
@@ -927,6 +1066,12 @@ void MainWindow::onBatchSelectFiles() {
 }
 
 void MainWindow::onBatchRecognize() {
+    {
+        std::ostringstream oss;
+        oss << "onBatchRecognize: requested"
+            << ", item_count=" << batch_items_.size();
+        logMessage(oss.str());
+    }
     if (!ensureModelLoaded()) {
         return;
     }
@@ -938,11 +1083,15 @@ void MainWindow::onBatchRecognize() {
     setStatusText(qs("批量识别中..."));
 
     int success_count = 0;
-    for (auto& item : batch_items_) {
+    for (size_t index = 0; index < batch_items_.size(); ++index) {
+        auto& item = batch_items_[index];
         if (item.status == qs("成功") || item.status == qs("失败")) {
+            logMessage("onBatchRecognize: skip finalized item, index=" + std::to_string(index));
             continue;
         }
 
+        logMessage("onBatchRecognize: processing item, index=" + std::to_string(index) +
+                   ", source_name=" + item.source_name.toStdString());
         const auto start = std::chrono::steady_clock::now();
         const auto result = item.image_data.empty()
                                 ? ocr_->predict(item.file_path.toStdString())
@@ -954,18 +1103,28 @@ void MainWindow::onBatchRecognize() {
             item.result_expr = QString::fromStdString(result.expression);
             item.status = qs("成功");
             success_count++;
+            logMessage("onBatchRecognize: item succeeded, index=" + std::to_string(index) +
+                       ", expression=" + result.expression +
+                       ", result=" + std::to_string(result.result) +
+                       ", elapsed_ms=" + std::to_string(item.elapsed_ms));
         } else {
             item.result_expr = QString::fromStdString(result.error);
             item.status = qs("失败");
+            logMessage("onBatchRecognize: item failed, index=" + std::to_string(index) +
+                       ", error=" + result.error +
+                       ", elapsed_ms=" + std::to_string(item.elapsed_ms));
         }
     }
 
+    logMessage("onBatchRecognize: finished, success_count=" + std::to_string(success_count) +
+               ", total_count=" + std::to_string(batch_items_.size()));
     refreshBatchTable();
     setStatusText(qs("批量识别完成: ") + QString::number(success_count) + QLatin1Char('/') +
                   QString::number(batch_items_.size()) + qs(" 成功"));
 }
 
 void MainWindow::onBatchClear() {
+    logMessage("onBatchClear: clearing items, previous_count=" + std::to_string(batch_items_.size()));
     batch_items_.clear();
     refreshBatchTable();
     setStatusText(qs("批量列表已清空"));
@@ -975,6 +1134,7 @@ void MainWindow::refreshBatchTable() {
     if (!batch_list_layout_) {
         return;
     }
+    logMessage("refreshBatchTable: rebuilding UI, item_count=" + std::to_string(batch_items_.size()));
 
     while (auto* item = batch_list_layout_->takeAt(0)) {
         if (auto* widget = item->widget()) {
@@ -1002,6 +1162,14 @@ void MainWindow::updateBatchStats() {
     }
 
     const double avg = recognized > 0 ? total_ms / recognized : 0.0;
+    {
+        std::ostringstream oss;
+        oss << "updateBatchStats: computed"
+            << ", total_items=" << batch_items_.size()
+            << ", recognized=" << recognized
+            << ", avg_ms=" << avg;
+        logMessage(oss.str());
+    }
     batch_stats_label_->setText(qs("共 ") + QString::number(batch_items_.size()) + qs(" 项 · 平均 ") +
                                 QString::number(avg, 'f', 1) + qs(" 毫秒"));
 }
@@ -1078,45 +1246,52 @@ QWidget* MainWindow::createBatchItemCard(const BatchItem& item, QWidget* parent)
 
 bool MainWindow::ensureModelLoaded() {
     if (!model_loaded_ || !ocr_ || !ocr_->is_loaded()) {
+        logMessage("ensureModelLoaded: model not loaded");
         QMessageBox::warning(this, qs("操作"), qs("请先加载模型。"));
         return false;
     }
+    logMessage("ensureModelLoaded: model ready");
     return true;
 }
 
 void MainWindow::displayImage(const QString& path) {
+    logMessage("displayImage: loading path=" + path.toStdString());
     const QPixmap pixmap(path);
     if (pixmap.isNull()) {
         logMessage("displayImage: failed to load " + path.toStdString());
         return;
     }
 
-    *preview_pixmap_ = pixmap;
-    updatePreviewPixmap();
-}
-
-void MainWindow::updatePreviewPixmap() {
-    if (!preview_label_ || !preview_pixmap_ || preview_pixmap_->isNull()) {
-        return;
+    {
+        std::ostringstream oss;
+        oss << "displayImage: loaded"
+            << ", width=" << pixmap.width()
+            << ", height=" << pixmap.height();
+        logMessage(oss.str());
     }
-
-    QSize target_size = preview_label_->contentsRect().size();
-    if (target_size.width() <= 0 || target_size.height() <= 0) {
-        target_size = preview_label_->size();
-    }
-
-    const auto scaled =
-        preview_pixmap_->scaled(target_size, Qt::KeepAspectRatio, Qt::SmoothTransformation);
-    preview_label_->setPixmap(scaled);
+    preview_label_->setPixmap(pixmap);
 }
 
 void MainWindow::displayResult(const PredictResult& result, double elapsed_ms) {
+    {
+        std::ostringstream oss;
+        oss << "displayResult: rendering"
+            << ", success=" << boolToString(result.success)
+            << ", elapsed_ms=" << elapsed_ms;
+        if (result.success) {
+            oss << ", expression=" << result.expression << ", result=" << result.result;
+        } else {
+            oss << ", error=" << result.error;
+        }
+        logMessage(oss.str());
+    }
     if (result.success) {
         result_expr_edit_->setProperty("error", false);
         result_expr_edit_->style()->unpolish(result_expr_edit_);
         result_expr_edit_->style()->polish(result_expr_edit_);
-        result_expr_edit_->setText(QString::fromStdString(result.expression));
-        elapsed_ms_edit_->setText(qs("用时：") + QString::number(elapsed_ms, 'f', 1) + qs(" 毫秒"));
+        setAdaptiveLineEditText(result_expr_edit_, QString::fromStdString(result.expression), 34, 14);
+        setAdaptiveLineEditText(
+            elapsed_ms_edit_, qs("用时：") + QString::number(elapsed_ms, 'f', 1) + qs(" 毫秒"), 14, 9);
         setStatusText(qs("识别成功"));
         return;
     }
@@ -1124,9 +1299,55 @@ void MainWindow::displayResult(const PredictResult& result, double elapsed_ms) {
     result_expr_edit_->setProperty("error", true);
     result_expr_edit_->style()->unpolish(result_expr_edit_);
     result_expr_edit_->style()->polish(result_expr_edit_);
-    result_expr_edit_->setText(QString::fromStdString(result.error));
-    elapsed_ms_edit_->setText(qs("用时：") + QString::number(elapsed_ms, 'f', 1) + qs(" 毫秒"));
+    setAdaptiveLineEditText(result_expr_edit_, QString::fromStdString(result.error), 28, 11);
+    setAdaptiveLineEditText(
+        elapsed_ms_edit_, qs("用时：") + QString::number(elapsed_ms, 'f', 1) + qs(" 毫秒"), 14, 9);
     setStatusText(qs("识别失败"));
+}
+
+void MainWindow::updateResultTextLayout() {
+    if (!result_expr_edit_ || !elapsed_ms_edit_) {
+        return;
+    }
+
+    const bool is_error = result_expr_edit_->property("error").toBool();
+    setAdaptiveLineEditText(result_expr_edit_, result_expr_edit_->text(), is_error ? 28 : 34,
+                            is_error ? 11 : 14);
+    setAdaptiveLineEditText(elapsed_ms_edit_, elapsed_ms_edit_->text(), 14, 9);
+}
+
+void MainWindow::setAdaptiveLineEditText(QLineEdit* edit,
+                                         const QString& text,
+                                         const int max_point_size,
+                                         const int min_point_size,
+                                         const Qt::Alignment alignment) {
+    if (!edit) {
+        return;
+    }
+
+    edit->setText(text);
+    edit->setAlignment(alignment);
+    edit->setToolTip(text);
+    edit->setCursorPosition(0);
+
+    QFont font = edit->font();
+    const bool is_result_field = edit == result_expr_edit_;
+    const int available_width = std::max(40, edit->contentsRect().width() - 12);
+    int fitted_point_size = min_point_size;
+
+    for (int point_size = max_point_size; point_size >= min_point_size; --point_size) {
+        font.setPointSize(point_size);
+        font.setBold(is_result_field);
+        const QFontMetrics metrics(font);
+        if (metrics.horizontalAdvance(text) <= available_width) {
+            fitted_point_size = point_size;
+            break;
+        }
+    }
+
+    font.setPointSize(fitted_point_size);
+    font.setBold(is_result_field);
+    edit->setFont(font);
 }
 
 void MainWindow::setStatusText(const QString& text) {

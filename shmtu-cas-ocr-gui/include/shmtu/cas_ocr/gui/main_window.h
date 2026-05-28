@@ -4,6 +4,7 @@
 #include <shmtu/cas_ocr/types.h>
 
 #include <QMainWindow>
+#include <Qt>
 #include <QString>
 
 #include <memory>
@@ -23,13 +24,14 @@ class QScrollArea;
 class QToolButton;
 class QVBoxLayout;
 class QWidget;
-class QPixmap;
 
 namespace shmtu::cas::ocr {
 class CasOcr;
 }
 
 namespace shmtu::cas::ocr::gui {
+
+class ImageView;
 
 class MainWindow final : public QMainWindow {
 public:
@@ -79,8 +81,13 @@ private:
 
     bool ensureModelLoaded();
     void displayImage(const QString& path);
-    void updatePreviewPixmap();
     void displayResult(const PredictResult& result, double elapsed_ms);
+    void updateResultTextLayout();
+    void setAdaptiveLineEditText(QLineEdit* edit,
+                                 const QString& text,
+                                 int max_point_size,
+                                 int min_point_size,
+                                 Qt::Alignment alignment = Qt::AlignCenter);
     void setStatusText(const QString& text);
 
     LaunchOptions launch_options_;
@@ -92,7 +99,6 @@ private:
     QString current_image_source_name_;
     std::vector<uint8_t> current_image_data_;
     std::vector<BatchItem> batch_items_;
-    std::unique_ptr<QPixmap> preview_pixmap_;
 
     QWidget* top_bar_panel_ = nullptr;
     QLineEdit* model_dir_edit_ = nullptr;
@@ -101,7 +107,8 @@ private:
     QProgressBar* download_progress_bar_ = nullptr;
 
     QWidget* main_panel_ = nullptr;
-    QLabel* preview_label_ = nullptr;
+    ImageView* preview_label_ = nullptr;
+    QComboBox* preview_mode_combo_ = nullptr;
     QLabel* source_path_label_ = nullptr;
     QLineEdit* result_expr_edit_ = nullptr;
     QLineEdit* elapsed_ms_edit_ = nullptr;

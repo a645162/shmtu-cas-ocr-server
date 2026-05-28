@@ -6,6 +6,7 @@
 
 #include <filesystem>
 #include <fstream>
+#include <sstream>
 #include <string>
 
 namespace shmtu::cas::ocr::gui {
@@ -70,6 +71,13 @@ bool curlDownload(const std::string& url,
                   long timeout_seconds,
                   long& http_status,
                   std::string& error_message) {
+    {
+        std::ostringstream oss;
+        oss << "curlDownload: begin"
+            << ", url=" << url
+            << ", timeout_seconds=" << timeout_seconds;
+        logMessage(oss.str());
+    }
     CURL* curl = curl_easy_init();
     if (!curl) {
         error_message = "curl_easy_init failed";
@@ -98,10 +106,15 @@ bool curlDownload(const std::string& url,
 
     if (code != CURLE_OK) {
         error_message = errbuf[0] ? errbuf : curl_easy_strerror(code);
+        logMessage("curlDownload: failed, url=" + url +
+                   ", http_status=" + std::to_string(http_status) +
+                   ", error=" + error_message);
         curl_easy_cleanup(curl);
         return false;
     }
 
+    logMessage("curlDownload: succeeded, url=" + url +
+               ", http_status=" + std::to_string(http_status));
     curl_easy_cleanup(curl);
     return true;
 }
@@ -134,6 +147,14 @@ std::vector<std::string> missingModelFiles(const std::string& model_dir,
             missing_files.push_back(filename);
         }
     }
+    {
+        std::ostringstream oss;
+        oss << "missingModelFiles: scanned"
+            << ", model_dir=" << model_dir
+            << ", precision=" << precision
+            << ", missing_count=" << missing_files.size();
+        logMessage(oss.str());
+    }
     return missing_files;
 }
 
@@ -143,11 +164,21 @@ bool downloadModelFiles(const std::string& model_dir,
                         const DownloadProgressCallback& progress_callback,
                         std::string& error_message) {
     error_message.clear();
+    {
+        std::ostringstream oss;
+        oss << "downloadModelFiles: begin"
+            << ", model_dir=" << model_dir
+            << ", missing_count=" << missing_files.size()
+            << ", use_gitee=" << (use_gitee ? "true" : "false");
+        logMessage(oss.str());
+    }
 
     try {
         std::filesystem::create_directories(model_dir);
     } catch (const std::exception& e) {
         error_message = e.what();
+        logMessage("downloadModelFiles: create_directories failed, model_dir=" + model_dir +
+                   ", error=" + error_message);
         return false;
     }
 
@@ -156,8 +187,10 @@ bool downloadModelFiles(const std::string& model_dir,
     bool all_ok = true;
 
     for (const auto& filename : missing_files) {
+        logMessage("downloadModelFiles: processing file=" + filename);
         if (progress_callback && !progress_callback(completed_files, total_files, filename)) {
             error_message = "下载已取消";
+            logMessage("downloadModelFiles: cancelled by progress callback");
             return false;
         }
 
@@ -172,6 +205,7 @@ bool downloadModelFiles(const std::string& model_dir,
             logMessage("downloadModelFiles: requesting " + url);
             const bool ok = downloadUrlToFile(url, filepath, http_status, curl_error);
             if (ok && http_status == 200) {
+                logMessage("downloadModelFiles: file downloaded, filepath=" + filepath);
                 return true;
             }
 
@@ -206,6 +240,15 @@ bool downloadModelFiles(const std::string& model_dir,
         (void)progress_callback(total_files, total_files, "");
     }
 
+    {
+        std::ostringstream oss;
+        oss << "downloadModelFiles: finished"
+            << ", success=" << (all_ok ? "true" : "false")
+            << ", completed_files=" << completed_files
+            << ", total_files=" << total_files;
+        logMessage(oss.str());
+    }
+
     return all_ok;
 }
 
@@ -214,8 +257,21 @@ bool downloadUrlToMemory(const std::string& url,
                          long& http_status,
                          std::string& error_message) {
     output.clear();
-    return curlDownload(url, curlWriteToVector, &output, nullptr, 30L,
-                        http_status, error_message);
+    const bool ok = curlDownload(url, curlWriteToVector, &output, nullptr, 30L,
+                                 http_status, error_message);
+    {
+        std::ostringstream oss;
+        oss << "downloadUrlToMemory: completed"
+            << ", url=" << url
+            << ", success=" << (ok ? "true" : "false")
+            << ", http_status=" << http_status
+            << ", bytes=" << output.size();
+        if (!error_message.empty()) {
+            oss << ", error=" << error_message;
+        }
+        logMessage(oss.str());
+    }
+    return ok;
 }
 
 }  // namespace shmtu::cas::ocr::gui

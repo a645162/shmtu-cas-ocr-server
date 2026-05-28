@@ -12,6 +12,7 @@ set(CMAKE_AUTORCC ON)
 
 add_executable(shmtu_cas_ocr_gui
     src/main.cpp
+    src/image_view.cpp
     src/logging.cpp
     src/main_window.cpp
     src/model_download.cpp

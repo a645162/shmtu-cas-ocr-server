@@ -10,6 +10,7 @@
 #include <QMessageBox>
 
 #include <csignal>
+#include <sstream>
 
 int main(int argc, char* argv[]) {
     using shmtu::cas::ocr::gui::LaunchOptions;
@@ -54,10 +55,17 @@ int main(int argc, char* argv[]) {
         }
         launch_options.precision = precision.toStdString();
     }
-    launch_options.use_gpu = parser.isSet(use_gpu_option);
+    launch_options.use_gpu = launch_options.use_gpu || parser.isSet(use_gpu_option);
 
     installCrashHandlers();
-    logMessage("main: GUI starting");
+    {
+        std::ostringstream oss;
+        oss << "main: GUI starting"
+            << ", model_dir=" << launch_options.model_dir
+            << ", precision=" << launch_options.precision
+            << ", use_gpu=" << (launch_options.use_gpu ? "true" : "false");
+        logMessage(oss.str());
+    }
 
 #ifndef _WIN32
     std::signal(SIGPIPE, SIG_IGN);
@@ -72,9 +80,11 @@ int main(int argc, char* argv[]) {
                 .arg(QString::fromUtf8(curl_easy_strerror(curl_init_rc))));
         return 1;
     }
+    logMessage("main: curl_global_init succeeded");
 
     MainWindow window(launch_options);
     window.show();
+    logMessage("main: main window shown");
 
     const int exit_code = app.exec();
     logMessage("main: cleaning up curl");
