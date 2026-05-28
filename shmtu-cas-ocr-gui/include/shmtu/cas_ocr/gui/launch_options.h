@@ -2,7 +2,7 @@
 
 #include <string>
 
-namespace shmtu::cas_ocr::gui {
+namespace shmtu::cas::ocr::gui {
 
 struct LaunchOptions {
     std::string model_dir = "./models";
@@ -10,4 +10,4 @@ struct LaunchOptions {
     bool use_gpu = false;
 };
 
-}  // namespace shmtu::cas_ocr::gui
+}  // namespace shmtu::cas::ocr::gui

@@ -6,7 +6,7 @@
 #include <drogon/HttpAppFramework.h>
 #include <drogon/MultiPart.h>
 
-namespace shmtu::cas_ocr {
+namespace shmtu::cas::ocr {
 
 namespace {
 
@@ -192,4 +192,4 @@ void register_http_handlers(OcrServer::Impl& impl, OcrServer& server) {
         {drogon::Post});
 }
 
-} // namespace shmtu::cas_ocr
+} // namespace shmtu::cas::ocr

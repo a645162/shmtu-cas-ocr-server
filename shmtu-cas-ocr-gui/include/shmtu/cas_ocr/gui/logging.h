@@ -2,9 +2,9 @@
 
 #include <string>
 
-namespace shmtu::cas_ocr::gui {
+namespace shmtu::cas::ocr::gui {
 
 void installCrashHandlers();
 void logMessage(const std::string& message);
 
-}  // namespace shmtu::cas_ocr::gui
+}  // namespace shmtu::cas::ocr::gui

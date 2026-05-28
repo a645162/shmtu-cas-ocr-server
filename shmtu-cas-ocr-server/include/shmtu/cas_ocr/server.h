@@ -4,7 +4,7 @@
 #include <string>
 #include <chrono>
 
-namespace shmtu::cas_ocr {
+namespace shmtu::cas::ocr {
 
 struct ServerConfig {
     std::string http_host = "0.0.0.0";
@@ -64,4 +64,4 @@ private:
     std::unique_ptr<Impl> impl_;
 };
 
-} // namespace shmtu::cas_ocr
+} // namespace shmtu::cas::ocr

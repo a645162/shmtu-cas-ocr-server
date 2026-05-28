@@ -12,10 +12,10 @@
 #include <csignal>
 
 int main(int argc, char* argv[]) {
-    using shmtu::cas_ocr::gui::LaunchOptions;
-    using shmtu::cas_ocr::gui::MainWindow;
-    using shmtu::cas_ocr::gui::installCrashHandlers;
-    using shmtu::cas_ocr::gui::logMessage;
+    using shmtu::cas::ocr::gui::LaunchOptions;
+    using shmtu::cas::ocr::gui::MainWindow;
+    using shmtu::cas::ocr::gui::installCrashHandlers;
+    using shmtu::cas::ocr::gui::logMessage;
 
     QApplication app(argc, argv);
     app.setApplicationName(QStringLiteral("SHMTU CAS OCR"));

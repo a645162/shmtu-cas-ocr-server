@@ -27,8 +27,6 @@ target_link_libraries(shmtu_cas_ocr_server
         Trantor::Trantor
 )
 
-target_compile_features(shmtu_cas_ocr_server PRIVATE cxx_std_20)
-
 if(MSVC)
     target_compile_options(shmtu_cas_ocr_server PRIVATE /W4 /wd4267)
 else()

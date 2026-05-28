@@ -52,8 +52,6 @@ if(OpenSSL_FOUND)
     target_compile_definitions(shmtu_cas_ocr_cli PRIVATE CPPHTTPLIB_OPENSSL_SUPPORT)
 endif()
 
-target_compile_features(shmtu_cas_ocr_cli PRIVATE cxx_std_20)
-
 # --------------------------------------------------------------------------
 # Compiler warnings
 # --------------------------------------------------------------------------

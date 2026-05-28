@@ -8,7 +8,7 @@
 #include <fstream>
 #include <string>
 
-namespace shmtu::cas_ocr::gui {
+namespace shmtu::cas::ocr::gui {
 namespace {
 
 constexpr auto GITHUB_BASE_URL =
@@ -218,4 +218,4 @@ bool downloadUrlToMemory(const std::string& url,
                         http_status, error_message);
 }
 
-}  // namespace shmtu::cas_ocr::gui
+}  // namespace shmtu::cas::ocr::gui

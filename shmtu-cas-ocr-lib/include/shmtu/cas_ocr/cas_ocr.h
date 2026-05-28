@@ -5,13 +5,12 @@
 #include <memory>
 #include <string>
 #include <vector>
-#include <optional>
 
 // Forward declarations to avoid exposing OpenCV in the public header
 // when consumers only need the API types.
 namespace cv { class Mat; }
 
-namespace shmtu::cas_ocr {
+namespace shmtu::cas::ocr {
 
 // Main OCR engine class for SHMTU CAS CAPTCHA recognition.
 //
@@ -21,15 +20,14 @@ namespace shmtu::cas_ocr {
 // (intended for worker-pool pattern in the server).
 //
 // Usage:
-//   shmtu::cas_ocr::CasOcr ocr("/path/to/models", false);
-//   ocr.load_model("fp16");
+//   shmtu::cas::ocr::CasOcr ocr("/path/to/models");
+//   ocr.load_model("fp16", false);
 //   auto result = ocr.predict("/path/to/captcha.png");
 class CasOcr {
 public:
     // Construct an OCR engine.
     // model_dir: directory containing .param/.bin model files.
-    // use_gpu:   attempt to use GPU (Vulkan) acceleration if available.
-    explicit CasOcr(const std::string& model_dir = "", bool use_gpu = false);
+    explicit CasOcr(const std::string& model_dir = "");
 
     ~CasOcr();
 
@@ -41,8 +39,9 @@ public:
 
     // Load models from the model_dir specified at construction.
     // precision: "fp16" or "fp32". Defaults to "fp16".
+    // use_gpu:   attempt to use GPU (Vulkan) acceleration if available.
     // Returns true if all three models loaded successfully.
-    bool load_model(const std::string& precision = "fp16");
+    bool load_model(const std::string& precision = "fp16", bool use_gpu = false);
 
     // Release loaded models and free GPU resources.
     void release();
@@ -86,4 +85,4 @@ private:
     std::unique_ptr<Impl> impl_;
 };
 
-} // namespace shmtu::cas_ocr
+} // namespace shmtu::cas::ocr

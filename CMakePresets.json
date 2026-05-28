@@ -12,7 +12,7 @@
       "generator": "Ninja",
       "binaryDir": "${sourceDir}/build/${presetName}",
       "cacheVariables": {
-        "CMAKE_CXX_STANDARD": "20",
+        "CMAKE_CXX_STANDARD": "23",
         "BUILD_SERVER": "ON",
         "BUILD_CLI": "ON",
         "BUILD_SHARED_LIBS": "OFF"

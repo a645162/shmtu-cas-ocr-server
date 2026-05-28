@@ -46,8 +46,6 @@ target_compile_definitions(shmtu_cas_ocr_lib
         $<$<BOOL:${USE_VULKAN}>:NCNN_SUPPORT_VULKAN>
 )
 
-target_compile_features(shmtu_cas_ocr_lib PUBLIC cxx_std_20)
-
 # --------------------------------------------------------------------------
 # Compiler warnings
 # --------------------------------------------------------------------------

@@ -25,11 +25,11 @@ class QVBoxLayout;
 class QWidget;
 class QPixmap;
 
-namespace shmtu::cas_ocr {
+namespace shmtu::cas::ocr {
 class CasOcr;
 }
 
-namespace shmtu::cas_ocr::gui {
+namespace shmtu::cas::ocr::gui {
 
 class MainWindow final : public QMainWindow {
 public:
@@ -84,11 +84,12 @@ private:
     void setStatusText(const QString& text);
 
     LaunchOptions launch_options_;
-    std::unique_ptr<shmtu::cas_ocr::CasOcr> ocr_;
+    std::unique_ptr<shmtu::cas::ocr::CasOcr> ocr_;
     bool model_loaded_ = false;
     bool download_active_ = false;
 
     QString current_image_path_;
+    QString current_image_source_name_;
     std::vector<uint8_t> current_image_data_;
     std::vector<BatchItem> batch_items_;
     std::unique_ptr<QPixmap> preview_pixmap_;
@@ -128,4 +129,4 @@ private:
     QVBoxLayout* batch_list_layout_ = nullptr;
 };
 
-}  // namespace shmtu::cas_ocr::gui
+}  // namespace shmtu::cas::ocr::gui

@@ -3,7 +3,7 @@
 #include <cstdint>
 #include <string>
 
-namespace shmtu::cas_ocr {
+namespace shmtu::cas::ocr {
 
 // Operator type recognized from the captcha image.
 // CHS variants indicate Chinese-character style operators.
@@ -58,4 +58,4 @@ struct GpuDeviceInfo {
     VulkanDeviceType device_type = VulkanDeviceType::DiscreteGPU;
 };
 
-} // namespace shmtu::cas_ocr
+} // namespace shmtu::cas::ocr

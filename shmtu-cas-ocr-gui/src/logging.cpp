@@ -9,7 +9,7 @@
 #include <fcntl.h>
 #include <unistd.h>
 
-namespace shmtu::cas_ocr::gui {
+namespace shmtu::cas::ocr::gui {
 namespace {
 
 constexpr auto LOG_PATH = "/tmp/shmtu_cas_ocr_gui.log";
@@ -92,4 +92,4 @@ void logMessage(const std::string& message) {
     writeRawLogLine(line);
 }
 
-}  // namespace shmtu::cas_ocr::gui
+}  // namespace shmtu::cas::ocr::gui

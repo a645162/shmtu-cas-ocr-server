@@ -27,7 +27,7 @@
 #include <trantor/net/TcpConnection.h>
 #include <trantor/net/TcpServer.h>
 
-namespace shmtu::cas_ocr {
+namespace shmtu::cas::ocr {
 
 std::vector<uint8_t> base64_decode(std::string_view input);
 
@@ -77,4 +77,4 @@ void register_http_handlers(OcrServer::Impl& impl, OcrServer& server);
 void start_tcp_server(OcrServer::Impl& impl);
 void stop_tcp_server(OcrServer::Impl& impl);
 
-} // namespace shmtu::cas_ocr
+} // namespace shmtu::cas::ocr

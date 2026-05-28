@@ -30,8 +30,6 @@ target_link_libraries(shmtu_cas_ocr_gui
         CURL::libcurl
 )
 
-target_compile_features(shmtu_cas_ocr_gui PRIVATE cxx_std_20)
-
 if(MSVC)
     target_compile_options(shmtu_cas_ocr_gui PRIVATE /W4 /wd4267)
 else()

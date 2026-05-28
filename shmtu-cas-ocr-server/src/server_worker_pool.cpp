@@ -2,7 +2,7 @@
 
 #include <utility>
 
-namespace shmtu::cas_ocr {
+namespace shmtu::cas::ocr {
 
 namespace {
 
@@ -138,4 +138,4 @@ PredictResult OcrServer::Impl::predict_sync(
     return result;
 }
 
-} // namespace shmtu::cas_ocr
+} // namespace shmtu::cas::ocr

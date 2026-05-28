@@ -294,7 +294,7 @@ static std::string json_escape(const std::string& s) {
     return out;
 }
 
-static std::string predict_result_to_json(const shmtu::cas_ocr::PredictResult& r) {
+static std::string predict_result_to_json(const shmtu::cas::ocr::PredictResult& r) {
     std::string json = "{";
     json += "\"success\":" + std::string(r.success ? "true" : "false") + ",";
     json += "\"expression\":\"" + json_escape(r.expression) + "\",";
@@ -424,7 +424,7 @@ static RemoteOcrResult call_remote_ocr_file(
 // ===========================================================================
 
 static void process_image_local(
-    shmtu::cas_ocr::CasOcr& ocr,
+    shmtu::cas::ocr::CasOcr& ocr,
     const std::string& path,
     bool json_output
 ) {
@@ -478,7 +478,7 @@ static void process_image_remote(
 
 struct CompareEntry {
     std::string file_path;
-    shmtu::cas_ocr::PredictResult local_result;
+    shmtu::cas::ocr::PredictResult local_result;
     RemoteOcrResult remote_result;
     bool local_ok = false;
     bool remote_ok = false;
@@ -564,7 +564,7 @@ static void print_compare_summary(const std::vector<CompareEntry>& entries) {
 }
 
 static void process_image_compare(
-    shmtu::cas_ocr::CasOcr& ocr,
+    shmtu::cas::ocr::CasOcr& ocr,
     const std::string& host,
     int port,
     const std::string& path,
@@ -637,20 +637,20 @@ int main(int argc, char* argv[]) {
     const bool need_remote = config.server_mode || config.compare_mode;
 
     // Initialize local OCR engine if needed
-    std::unique_ptr<shmtu::cas_ocr::CasOcr> ocr;
+    std::unique_ptr<shmtu::cas::ocr::CasOcr> ocr;
     if (need_local) {
-        ocr = std::make_unique<shmtu::cas_ocr::CasOcr>(config.model_dir, config.use_gpu);
+        ocr = std::make_unique<shmtu::cas::ocr::CasOcr>(config.model_dir);
 
         printf("Loading models from: %s (precision=%s)...\n",
                config.model_dir.c_str(), config.precision.c_str());
 
-        if (!ocr->load_model(config.precision)) {
+        if (!ocr->load_model(config.precision, config.use_gpu)) {
             fprintf(stderr, "Failed to load models.\n");
             return 1;
         }
 
         printf("Model loaded (%s).\n\n",
-               ocr->model_status() == shmtu::cas_ocr::ModelStatus::LoadedGPU ? "GPU" : "CPU");
+               ocr->model_status() == shmtu::cas::ocr::ModelStatus::LoadedGPU ? "GPU" : "CPU");
     }
 
     // Verify remote server connectivity if needed

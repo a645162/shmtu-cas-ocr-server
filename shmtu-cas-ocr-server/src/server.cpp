@@ -8,7 +8,7 @@
 
 #include <drogon/HttpAppFramework.h>
 
-namespace shmtu::cas_ocr {
+namespace shmtu::cas::ocr {
 
 OcrServer::OcrServer(const ServerConfig& config)
     : impl_(std::make_unique<Impl>(config)) {
@@ -31,14 +31,14 @@ int OcrServer::run() {
                 cfg.use_gpu ? "true" : "false");
 
     for (int i = 0; i < cfg.worker_count; ++i) {
-        auto ocr = std::make_unique<CasOcr>(cfg.model_dir, cfg.use_gpu);
+        auto ocr = std::make_unique<CasOcr>(cfg.model_dir);
 #ifdef NCNN_SUPPORT_VULKAN
         if (cfg.use_gpu && CasOcr::gpu_count() > 0) {
             const auto gpu = CasOcr::gpu_info(i % CasOcr::gpu_count());
             std::printf("GPU device %d: %s\n", gpu.device_index, gpu.device_name.c_str());
         }
 #endif
-        if (!ocr->load_model(cfg.precision)) {
+        if (!ocr->load_model(cfg.precision, cfg.use_gpu)) {
             std::fprintf(stderr, "Failed to load model for worker %d\n", i);
             return -1;
         }
@@ -125,4 +125,4 @@ ServerStats OcrServer::stats() const {
     return stats;
 }
 
-} // namespace shmtu::cas_ocr
+} // namespace shmtu::cas::ocr

@@ -43,7 +43,7 @@
 #include <memory>
 #include <string>
 
-namespace shmtu::cas_ocr::gui {
+namespace shmtu::cas::ocr::gui {
 namespace {
 
 constexpr auto APP_TITLE_CN = "海大验证码识别 - NCNN";
@@ -196,6 +196,23 @@ QScrollArea {
     background: transparent;
     border: none;
 }
+QScrollBar:vertical {
+    background: transparent;
+    width: 8px;
+    margin: 2px 0 2px 0;
+}
+QScrollBar::handle:vertical {
+    background: #c6d5e5;
+    border-radius: 4px;
+    min-height: 28px;
+}
+QScrollBar::add-line:vertical,
+QScrollBar::sub-line:vertical,
+QScrollBar::add-page:vertical,
+QScrollBar::sub-page:vertical {
+    background: transparent;
+    height: 0;
+}
 QWidget#batchItemCard {
     background: %4;
     border: 1px solid %3;
@@ -282,7 +299,7 @@ void setAccentButton(QPushButton* button) {
 
 MainWindow::MainWindow(const LaunchOptions& launch_options)
     : launch_options_(launch_options),
-      ocr_(std::make_unique<shmtu::cas_ocr::CasOcr>()),
+      ocr_(std::make_unique<shmtu::cas::ocr::CasOcr>()),
       preview_pixmap_(std::make_unique<QPixmap>()) {
     setWindowTitle(qs(APP_TITLE_CN));
     resize(980, 720);
@@ -350,6 +367,25 @@ void MainWindow::buildTopBar(QVBoxLayout* root_layout) {
     row_layout->addWidget(model_status_label_);
 
     panel_layout->addLayout(row_layout);
+
+    auto* option_row = new QHBoxLayout();
+    option_row->setSpacing(8);
+    option_row->addWidget(createDimLabel(qs("精度:"), top_bar_panel_));
+
+    precision_combo_ = new QComboBox(top_bar_panel_);
+    precision_combo_->addItems(QStringList() << QStringLiteral("fp16") << QStringLiteral("fp32"));
+    precision_combo_->setCurrentText(
+        isSupportedPrecision(QString::fromStdString(launch_options_.precision))
+            ? QString::fromStdString(launch_options_.precision)
+            : QStringLiteral("fp16"));
+    option_row->addWidget(precision_combo_);
+
+    use_gpu_checkbox_ = new QCheckBox(qs("GPU加速"), top_bar_panel_);
+    use_gpu_checkbox_->setChecked(launch_options_.use_gpu);
+    option_row->addWidget(use_gpu_checkbox_);
+    option_row->addStretch(1);
+
+    panel_layout->addLayout(option_row);
 
     auto* progress_card = createCard(top_bar_panel_, "innerCard");
     auto* progress_layout = new QVBoxLayout(progress_card);
@@ -563,27 +599,6 @@ void MainWindow::buildBottomBar(QVBoxLayout* root_layout) {
     status_block_layout->addWidget(status_label_);
     bottom_layout->addWidget(status_block, 1);
 
-    auto* control_card = createCard(bottom_bar_panel_, "innerCard");
-    auto* control_layout = new QHBoxLayout(control_card);
-    control_layout->setContentsMargins(12, 8, 12, 8);
-    control_layout->setSpacing(12);
-
-    control_layout->addWidget(createDimLabel(qs("精度:"), control_card));
-
-    precision_combo_ = new QComboBox(control_card);
-    precision_combo_->addItems({QStringLiteral("fp16"), QStringLiteral("fp32")});
-    precision_combo_->setCurrentText(isSupportedPrecision(QString::fromStdString(
-                                         launch_options_.precision))
-                                         ? QString::fromStdString(launch_options_.precision)
-                                         : QStringLiteral("fp16"));
-    control_layout->addWidget(precision_combo_);
-
-    use_gpu_checkbox_ = new QCheckBox(qs("GPU加速"), control_card);
-    use_gpu_checkbox_->setChecked(launch_options_.use_gpu);
-    control_layout->addWidget(use_gpu_checkbox_);
-
-    bottom_layout->addWidget(control_card);
-
     root_layout->addWidget(bottom_bar_panel_);
 }
 
@@ -748,8 +763,8 @@ void MainWindow::loadModelFromCurrentSettings() {
     const auto precision = precision_combo_->currentText().toStdString();
     const bool use_gpu = use_gpu_checkbox_->isChecked();
 
-    ocr_ = std::make_unique<shmtu::cas_ocr::CasOcr>(model_dir, use_gpu);
-    if (!ocr_->load_model(precision.empty() ? "fp16" : precision)) {
+    ocr_ = std::make_unique<shmtu::cas::ocr::CasOcr>(model_dir);
+    if (!ocr_->load_model(precision.empty() ? "fp16" : precision, use_gpu)) {
         model_loaded_ = false;
         updateModelStatusUi();
         setStatusText(qs("模型加载失败"));
@@ -819,6 +834,7 @@ void MainWindow::onDownloadCaptcha() {
     }
 
     current_image_path_ = QString::fromStdString(temp_file.string());
+    current_image_source_name_ = unique_name + QStringLiteral("  |  ") + url;
     current_image_data_ = std::move(image_data);
     displayImage(current_image_path_);
     source_path_label_->setText(url);
@@ -836,6 +852,7 @@ void MainWindow::onOpenLocalImage() {
     }
 
     current_image_path_ = path;
+    current_image_source_name_ = path;
     current_image_data_.clear();
     displayImage(path);
     source_path_label_->setText(path);
@@ -876,7 +893,9 @@ void MainWindow::onAddToBatch() {
 
     BatchItem item;
     item.file_path = current_image_path_;
-    item.source_name = source_path_label_->text().trimmed();
+    item.source_name = current_image_source_name_.isEmpty()
+                           ? source_path_label_->text().trimmed()
+                           : current_image_source_name_;
     item.status = qs("待识别");
     item.image_data = current_image_data_;
     batch_items_.push_back(std::move(item));
@@ -1117,4 +1136,4 @@ void MainWindow::setStatusText(const QString& text) {
     logMessage("setStatusText: " + text.toStdString());
 }
 
-}  // namespace shmtu::cas_ocr::gui
+}  // namespace shmtu::cas::ocr::gui

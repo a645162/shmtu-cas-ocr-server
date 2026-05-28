@@ -5,7 +5,7 @@
 #include <string>
 #include <vector>
 
-namespace shmtu::cas_ocr::gui {
+namespace shmtu::cas::ocr::gui {
 
 using DownloadProgressCallback =
     std::function<bool(int completed_files, int total_files, const std::string& filename)>;
@@ -24,4 +24,4 @@ bool downloadUrlToMemory(const std::string& url,
                          long& http_status,
                          std::string& error_message);
 
-}  // namespace shmtu::cas_ocr::gui
+}  // namespace shmtu::cas::ocr::gui

@@ -8,7 +8,7 @@
 #include <trantor/net/InetAddress.h>
 #include <trantor/utils/MsgBuffer.h>
 
-namespace shmtu::cas_ocr {
+namespace shmtu::cas::ocr {
 
 namespace {
 
@@ -121,4 +121,4 @@ void stop_tcp_server(OcrServer::Impl& impl) {
     impl.tcp_buffers.clear();
 }
 
-} // namespace shmtu::cas_ocr
+} // namespace shmtu::cas::ocr

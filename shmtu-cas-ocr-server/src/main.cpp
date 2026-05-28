@@ -12,7 +12,7 @@
 #define SHMTU_CAS_SERVER_VERSION "2.0.0"
 #endif
 
-static shmtu::cas_ocr::OcrServer* g_server = nullptr;
+static shmtu::cas::ocr::OcrServer* g_server = nullptr;
 
 static void signal_handler(int sig) {
     if (sig == SIGINT || sig == SIGTERM) {
@@ -31,8 +31,8 @@ static void print_banner() {
     std::printf("\n");
 }
 
-static shmtu::cas_ocr::ServerConfig parse_args(int argc, char* argv[]) {
-    shmtu::cas_ocr::ServerConfig config;
+static shmtu::cas::ocr::ServerConfig parse_args(int argc, char* argv[]) {
+    shmtu::cas::ocr::ServerConfig config;
 
     for (int i = 1; i < argc; ++i) {
         std::string arg = argv[i];
@@ -88,13 +88,13 @@ int main(int argc, char* argv[]) {
 
 #ifdef NCNN_SUPPORT_VULKAN
     if (config.use_gpu) {
-        int gpu_count = shmtu::cas_ocr::CasOcr::gpu_count();
+        int gpu_count = shmtu::cas::ocr::CasOcr::gpu_count();
         if (gpu_count == 0) {
             std::fprintf(stderr, "WARNING: GPU requested but no Vulkan devices found. Falling back to CPU.\n");
             config.use_gpu = false;
         } else {
             std::printf("\nGPU Devices (%d):\n", gpu_count);
-            auto gpus = shmtu::cas_ocr::CasOcr::all_gpu_info();
+            auto gpus = shmtu::cas::ocr::CasOcr::all_gpu_info();
             for (const auto& gpu : gpus) {
                 std::printf("  [%d] %s (API %u, %u MB)\n",
                             gpu.device_index, gpu.device_name.c_str(),
@@ -106,7 +106,7 @@ int main(int argc, char* argv[]) {
 
     std::printf("\n");
 
-    shmtu::cas_ocr::OcrServer server(config);
+    shmtu::cas::ocr::OcrServer server(config);
     g_server = &server;
 
     std::signal(SIGINT, signal_handler);
