@@ -36,6 +36,17 @@ message(STATUS "Build CLI:    ${BUILD_CLI}")
 message(STATUS "Build GUI:    ${BUILD_GUI}")
 message(STATUS "Use Vulkan:   ${USE_VULKAN}")
 
+set(SHMTU_CAN_BUILD_GUI FALSE)
+if(BUILD_GUI AND EXISTS "${CMAKE_SOURCE_DIR}/shmtu-cas-ocr-gui/CMakeLists.txt")
+    find_package(Qt6 QUIET COMPONENTS Widgets)
+    if(Qt6Widgets_FOUND)
+        set(SHMTU_CAN_BUILD_GUI TRUE)
+        message(STATUS "Qt6 Widgets found: GUI target enabled")
+    else()
+        message(STATUS "Qt6 Widgets not found: skipping shmtu-cas-ocr-gui")
+    endif()
+endif()
+
 # --------------------------------------------------------------------------
 # 3rdparty hint paths
 # --------------------------------------------------------------------------
@@ -82,6 +93,6 @@ if(BUILD_CLI)
     add_subdirectory(shmtu-cas-ocr-cli)
 endif()
 
-if(BUILD_GUI AND EXISTS "${CMAKE_SOURCE_DIR}/shmtu-cas-ocr-gui/CMakeLists.txt")
+if(SHMTU_CAN_BUILD_GUI)
     add_subdirectory(shmtu-cas-ocr-gui)
 endif()

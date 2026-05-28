@@ -10,7 +10,9 @@ from typing import Sequence
 SCRIPT_DIR = Path(__file__).resolve().parent
 PROJECT_ROOT = SCRIPT_DIR.parent
 DEFAULT_BUILD_DIR = PROJECT_ROOT / "build" / "linux-vcpkg-vulkan"
-FALLBACK_BUILD_DIR = Path("/tmp/shmtu-drogon-vulkan-config")
+DEFAULT_GUI_BUILD_DIR = PROJECT_ROOT / "build" / "linux-vcpkg-vulkan-gui"
+FALLBACK_BUILD_DIR = PROJECT_ROOT / "build" / "linux-vcpkg"
+FALLBACK_GUI_BUILD_DIR = PROJECT_ROOT / "build" / "linux-vcpkg-gui"
 
 
 def env_flag(name: str, default: bool = True) -> bool:
@@ -25,6 +27,8 @@ def resolve_build_dir(binary_relpath: str) -> Path:
     candidates = []
     if build_dir_env:
         candidates.append(Path(build_dir_env))
+    if "shmtu-cas-ocr-gui/" in binary_relpath:
+        candidates.extend([DEFAULT_GUI_BUILD_DIR, FALLBACK_GUI_BUILD_DIR])
     candidates.extend([DEFAULT_BUILD_DIR, FALLBACK_BUILD_DIR])
 
     for candidate in candidates:
@@ -43,10 +47,12 @@ def resolve_build_dir(binary_relpath: str) -> Path:
 def find_build_dirs() -> list[Path]:
     """Find all existing build directories under the project root."""
     dirs = []
-    for d in PROJECT_ROOT.iterdir():
-        if d.is_dir() and d.name.startswith("build") and (d / "CMakeCache.txt").is_file():
-            dirs.append(d)
-    dirs.sort(key=lambda d: (0 if d.name == "build-gui" else 1 if d.name == "build" else 2))
+    build_root = PROJECT_ROOT / "build"
+    if build_root.is_dir():
+        for d in build_root.iterdir():
+            if d.is_dir() and (d / "CMakeCache.txt").is_file():
+                dirs.append(d)
+    dirs.sort(key=lambda d: d.name)
     return dirs
 
 
@@ -70,6 +76,9 @@ def cmake_configure(
         "cmake",
         "-B", str(build_dir),
         f"-DCMAKE_TOOLCHAIN_FILE={toolchain}",
+        "-DVCPKG_MANIFEST_MODE=ON",
+        "-DVCPKG_FEATURE_FLAGS=manifests",
+        f"-DVCPKG_MANIFEST_FEATURES={'vulkan' if use_vulkan else ''}",
         f"-DBUILD_SERVER={'ON' if build_server else 'OFF'}",
         f"-DBUILD_CLI={'ON' if build_cli else 'OFF'}",
         f"-DBUILD_GUI={'ON' if build_gui else 'OFF'}",
@@ -121,9 +130,12 @@ def build_target(
     # Need to build
     print(f"[build] Building {target}...")
 
-    build_dir = Path(build_dir_env) if build_dir_env else (
-        PROJECT_ROOT / "build-gui" if build_gui else PROJECT_ROOT / "build"
-    )
+    if build_dir_env:
+        build_dir = Path(build_dir_env)
+    elif build_gui:
+        build_dir = PROJECT_ROOT / "build" / ("linux-vcpkg-vulkan-gui" if use_vulkan else "linux-vcpkg-gui")
+    else:
+        build_dir = PROJECT_ROOT / "build" / ("linux-vcpkg-vulkan" if use_vulkan else "linux-vcpkg")
 
     # Configure
     rc = cmake_configure(

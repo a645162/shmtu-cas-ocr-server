@@ -30,11 +30,29 @@
       }
     },
     {
+      "name": "linux-vcpkg-gui",
+      "inherits": "linux-vcpkg",
+      "cacheVariables": {
+        "BUILD_SERVER": "OFF",
+        "BUILD_CLI": "OFF",
+        "BUILD_GUI": "ON"
+      }
+    },
+    {
       "name": "linux-vcpkg-vulkan",
       "inherits": "linux-vcpkg",
       "cacheVariables": {
         "VCPKG_MANIFEST_FEATURES": "vulkan",
         "USE_VULKAN": "ON"
+      }
+    },
+    {
+      "name": "linux-vcpkg-vulkan-gui",
+      "inherits": "linux-vcpkg-vulkan",
+      "cacheVariables": {
+        "BUILD_SERVER": "OFF",
+        "BUILD_CLI": "OFF",
+        "BUILD_GUI": "ON"
       }
     }
   ],
@@ -44,8 +62,16 @@
       "configurePreset": "linux-vcpkg"
     },
     {
+      "name": "build-linux-vcpkg-gui",
+      "configurePreset": "linux-vcpkg-gui"
+    },
+    {
       "name": "build-linux-vcpkg-vulkan",
       "configurePreset": "linux-vcpkg-vulkan"
+    },
+    {
+      "name": "build-linux-vcpkg-vulkan-gui",
+      "configurePreset": "linux-vcpkg-vulkan-gui"
     }
   ]
 }

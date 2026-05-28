@@ -6,8 +6,7 @@
     "opencv4",
     "ncnn",
     "drogon",
-    "trantor",
-    "wxwidgets"
+    "trantor"
   ],
   "features": {
     "vulkan": {

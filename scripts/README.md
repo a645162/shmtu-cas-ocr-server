@@ -77,8 +77,9 @@ SHMTU_BUILD_PRESET=build-linux-vcpkg python3 ./scripts/run_lib_check.py
 运行脚本会按下面顺序寻找可执行文件：
 
 1. `SHMTU_BUILD_DIR`
-2. `${PROJECT_ROOT}/build/linux-vcpkg-vulkan`
-3. `/tmp/shmtu-drogon-vulkan-config`
+2. GUI: `${PROJECT_ROOT}/build/linux-vcpkg-vulkan-gui` 或 `${PROJECT_ROOT}/build/linux-vcpkg-gui`
+3. 非 GUI: `${PROJECT_ROOT}/build/linux-vcpkg-vulkan`
+4. `${PROJECT_ROOT}/build/linux-vcpkg`
 
 如果没有找到对应二进制，脚本会直接报错并退出。
 
@@ -116,4 +117,11 @@ cmake --preset linux-vcpkg-vulkan
 cmake --build --preset build-linux-vcpkg-vulkan
 ```
 
-这样脚本会优先从 `build/linux-vcpkg-vulkan` 直接启动，不再依赖 `/tmp/shmtu-drogon-vulkan-config`。
+如果要运行 GUI，建议用：
+
+```bash
+cmake --preset linux-vcpkg-vulkan-gui
+cmake --build --preset build-linux-vcpkg-vulkan-gui
+```
+
+这样所有目标都会统一落在 `build/` 下的子目录中，不再单独使用 `build-gui/` 或 `/tmp` 构建目录。

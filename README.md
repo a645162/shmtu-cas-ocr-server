@@ -31,7 +31,7 @@ python3 3rdparty/NCNN/download_ncnn.py --tag 20260526 --ubuntu 2404
 * `shmtu-cas-ocr-cli`
   * 命令行工具
 * `shmtu-cas-ocr-gui`
-  * `wxWidgets` 桌面 GUI
+  * `Qt6 Widgets` 桌面 GUI
 
 `server`、`cli`、`gui` 都依赖 `lib`，而不是把 Web 或 GUI 框架反向耦合到 OCR 核心库里。
 
@@ -48,7 +48,6 @@ python3 3rdparty/NCNN/download_ncnn.py --tag 20260526 --ubuntu 2404
 * `ncnn`
 * `drogon`
 * `trantor`
-* `wxwidgets`
 
 Vulkan 支持通过 manifest feature 启用：
 
@@ -77,6 +76,16 @@ export VCPKG_ROOT=/path/to/vcpkg
 cmake --preset linux-vcpkg
 cmake --build --preset build-linux-vcpkg
 ```
+
+如果你要构建 GUI：
+
+```bash
+export VCPKG_ROOT=/path/to/vcpkg
+cmake --preset linux-vcpkg-vulkan-gui
+cmake --build --preset build-linux-vcpkg-vulkan-gui
+```
+
+如果当前环境找不到 `Qt6 Widgets`，顶层 `CMakeLists.txt` 会自动跳过 `shmtu-cas-ocr-gui`，不会让整个工程配置失败。
 
 如果你希望手动安装 manifest feature，也可以使用：
 

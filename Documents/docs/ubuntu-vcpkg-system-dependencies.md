@@ -10,7 +10,7 @@ bringing up the current stack:
 * `Drogon + Trantor`
 * `ncnn` with `Vulkan`
 * `OpenCV`
-* `wxWidgets`
+* `Qt6`
 
 ## Confirmed Required Packages
 
@@ -50,28 +50,26 @@ the Linux GUI and OpenCV stack.
 Confirmed required by the `gperf` port during `vcpkg install`.
 
 `gperf` is part of the transitive dependency chain when resolving the current
-Linux desktop stack used by `wxWidgets` and related packages.
+Linux desktop stack used by GUI-related packages.
 
 ### `libx11-dev`, `libxft-dev`, `libxext-dev`
 
 Reported by the `cairo` port when building with the `x11` feature enabled.
 
 These are Xorg development packages from Ubuntu, and they are needed by the
-Linux desktop GUI dependency chain used by `wxWidgets`.
+Linux desktop GUI dependency chain.
 
 ### `libgles2-mesa-dev`
 
 Reported by the `libepoxy` port.
 
-This package is needed by the Linux OpenGL / GUI dependency chain pulled in by
-`wxWidgets` and related desktop libraries.
+This package is needed by the Linux OpenGL / GUI dependency chain.
 
 ### `libxi-dev`, `libxtst-dev`
 
 Reported by the `at-spi2-core` port.
 
-These packages are part of the Linux accessibility / GTK desktop stack pulled
-in by `wxWidgets` on Ubuntu.
+These packages are part of the Linux accessibility / desktop GUI stack on Ubuntu.
 
 ### `libwayland-dev`, `libxkbcommon-dev`, `libegl1-mesa-dev`
 
@@ -102,7 +100,7 @@ The current manifest-managed project stack includes:
 * `ncnn`
 * `opencv4`
 * `fmt`
-* `wxwidgets`
+* `Qt6` from Ubuntu `apt`
 
 Vulkan support is enabled through the manifest feature:
 
@@ -113,7 +111,7 @@ Vulkan support is enabled through the manifest feature:
 After the system packages above are installed:
 
 ```bash
-cmake -S . -B build/linux-vcpkg \
+cmake -S . -B build/linux-vcpkg-vulkan-gui \
   -DCMAKE_TOOLCHAIN_FILE=$VCPKG_ROOT/scripts/buildsystems/vcpkg.cmake \
   -DVCPKG_MANIFEST_MODE=ON \
   -DVCPKG_FEATURE_FLAGS=manifests \
@@ -127,5 +125,5 @@ cmake -S . -B build/linux-vcpkg \
 Then build:
 
 ```bash
-cmake --build build/linux-vcpkg
+cmake --build build/linux-vcpkg-vulkan-gui
 ```
