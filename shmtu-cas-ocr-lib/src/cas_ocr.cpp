@@ -3,7 +3,9 @@
 #include <algorithm>
 #include <cstring>
 #include <mutex>
+#include <span>
 #include <string>
+#include <string_view>
 #include <vector>
 
 #include <opencv2/core.hpp>
@@ -309,15 +311,17 @@ struct CasOcr::Impl {
     }
 };
 
-CasOcr::CasOcr(const std::string& model_dir) : impl_(new Impl(model_dir)) {}
+CasOcr::CasOcr(std::string model_dir) : impl_(new Impl(std::move(model_dir))) {}
 
 CasOcr::~CasOcr() = default;
 
 CasOcr::CasOcr(CasOcr&&) noexcept = default;
 CasOcr& CasOcr::operator=(CasOcr&&) noexcept = default;
 
-bool CasOcr::load_model(const std::string& precision, const bool use_gpu) {
-    return impl_->load_all_models(precision.empty() ? "fp16" : precision, use_gpu);
+bool CasOcr::load_model(const std::string_view precision, const bool use_gpu) {
+    return impl_->load_all_models(
+        precision.empty() ? "fp16" : std::string(precision),
+        use_gpu);
 }
 
 void CasOcr::release() {
@@ -351,18 +355,18 @@ PredictResult CasOcr::predict(const cv::Mat& image) {
     return impl_->predict_validate_code(image);
 }
 
-PredictResult CasOcr::predict(const std::string& image_path) {
-    const cv::Mat image = cv::imread(image_path, cv::IMREAD_COLOR);
+PredictResult CasOcr::predict(const std::string_view image_path) {
+    const cv::Mat image = cv::imread(std::string(image_path), cv::IMREAD_COLOR);
     if (image.empty()) {
         PredictResult result;
         result.success = false;
-        result.error = "Failed to read image: " + image_path;
+        result.error = "Failed to read image: " + std::string(image_path);
         return result;
     }
     return predict(image);
 }
 
-PredictResult CasOcr::predict(const std::vector<uint8_t>& image_data) {
+PredictResult CasOcr::predict(const std::span<const uint8_t> image_data) {
     if (image_data.empty()) {
         PredictResult result;
         result.success = false;
@@ -370,7 +374,12 @@ PredictResult CasOcr::predict(const std::vector<uint8_t>& image_data) {
         return result;
     }
 
-    const cv::Mat image = cv::imdecode(image_data, cv::IMREAD_COLOR);
+    const cv::Mat encoded(
+        1,
+        static_cast<int>(image_data.size()),
+        CV_8UC1,
+        const_cast<uint8_t*>(image_data.data()));
+    const cv::Mat image = cv::imdecode(encoded, cv::IMREAD_COLOR);
     if (image.empty()) {
         PredictResult result;
         result.success = false;

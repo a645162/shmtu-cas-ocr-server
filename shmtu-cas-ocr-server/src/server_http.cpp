@@ -1,6 +1,8 @@
 #include "server_internal.h"
 
 #include <algorithm>
+#include <expected>
+#include <string_view>
 #include <vector>
 
 #include <drogon/HttpAppFramework.h>
@@ -10,11 +12,32 @@ namespace shmtu::cas::ocr {
 
 namespace {
 
+using ResponseCallback = std::function<void(const drogon::HttpResponsePtr&)>;
+
+void respond_bad_request(OcrServer::Impl& impl,
+                         const std::string_view error,
+                         ResponseCallback&& callback) {
+    Json::Value body(Json::objectValue);
+    body["success"] = false;
+    body["error"] = std::string(error);
+    impl.failed_requests.fetch_add(1);
+    callback(make_json_response(body, drogon::k400BadRequest));
+}
+
+std::expected<std::vector<uint8_t>, std::string> decode_image_base64(
+    const Json::Value& json_body) {
+    if (!json_body.isMember("imageBase64") || !json_body["imageBase64"].isString()) {
+        return std::unexpected("ImageBase64 is required");
+    }
+
+    return base64_decode(json_body["imageBase64"].asString());
+}
+
 void handle_predict_result(
     OcrServer::Impl& impl,
     const PredictResult& result,
     bool queued_ok,
-    std::function<void(const drogon::HttpResponsePtr&)>&& callback) {
+    ResponseCallback&& callback) {
     if (!queued_ok) {
         Json::Value body(Json::objectValue);
         body["success"] = false;
@@ -124,32 +147,23 @@ void register_http_handlers(OcrServer::Impl& impl, OcrServer& server) {
     app.registerHandler(
         "/api/ocr",
         [&impl](const drogon::HttpRequestPtr& req,
-                std::function<void(const drogon::HttpResponsePtr&)>&& callback) {
+                ResponseCallback&& callback) {
             impl.total_requests.fetch_add(1);
 
             auto json = req->getJsonObject();
-            if (!json || !json->isMember("imageBase64") || !(*json)["imageBase64"].isString()) {
-                Json::Value body(Json::objectValue);
-                body["success"] = false;
-                body["error"] = "ImageBase64 is required";
-                impl.failed_requests.fetch_add(1);
-                callback(make_json_response(body, drogon::k400BadRequest));
+            if (!json) {
+                respond_bad_request(impl, "Invalid JSON body", std::move(callback));
                 return;
             }
 
-            const auto image_base64 = (*json)["imageBase64"].asString();
-            auto image_bytes = base64_decode(image_base64);
-            if (image_bytes.empty()) {
-                Json::Value body(Json::objectValue);
-                body["success"] = false;
-                body["error"] = "Invalid base64 string";
-                impl.failed_requests.fetch_add(1);
-                callback(make_json_response(body, drogon::k400BadRequest));
+            auto image_bytes = decode_image_base64(*json);
+            if (!image_bytes) {
+                respond_bad_request(impl, image_bytes.error(), std::move(callback));
                 return;
             }
 
             bool queued_ok = false;
-            auto result = impl.predict_sync(image_bytes, queued_ok);
+            auto result = impl.predict_sync(std::move(*image_bytes), queued_ok);
             handle_predict_result(impl, result, queued_ok, std::move(callback));
         },
         {drogon::Post});
@@ -157,26 +171,18 @@ void register_http_handlers(OcrServer::Impl& impl, OcrServer& server) {
     app.registerHandler(
         "/api/ocr/upload",
         [&impl](const drogon::HttpRequestPtr& req,
-                std::function<void(const drogon::HttpResponsePtr&)>&& callback) {
+                ResponseCallback&& callback) {
             impl.total_requests.fetch_add(1);
 
             drogon::MultiPartParser parser;
             if (parser.parse(req) != 0) {
-                Json::Value body(Json::objectValue);
-                body["success"] = false;
-                body["error"] = "Invalid multipart form data";
-                impl.failed_requests.fetch_add(1);
-                callback(make_json_response(body, drogon::k400BadRequest));
+                respond_bad_request(impl, "Invalid multipart form data", std::move(callback));
                 return;
             }
 
             const auto& files = parser.getFiles();
             if (files.empty()) {
-                Json::Value body(Json::objectValue);
-                body["success"] = false;
-                body["error"] = "Image file is required";
-                impl.failed_requests.fetch_add(1);
-                callback(make_json_response(body, drogon::k400BadRequest));
+                respond_bad_request(impl, "Image file is required", std::move(callback));
                 return;
             }
 
@@ -186,7 +192,7 @@ void register_http_handlers(OcrServer::Impl& impl, OcrServer& server) {
                 file.fileData() + file.fileLength());
 
             bool queued_ok = false;
-            auto result = impl.predict_sync(image_bytes, queued_ok);
+            auto result = impl.predict_sync(std::move(image_bytes), queued_ok);
             handle_predict_result(impl, result, queued_ok, std::move(callback));
         },
         {drogon::Post});

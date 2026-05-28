@@ -4,9 +4,12 @@
 #include <shmtu/cas_ocr/server.h>
 #include <shmtu/cas_ocr/cas_ocr.h>
 
+#include <charconv>
 #include <csignal>
+#include <expected>
 #include <cstdio>
 #include <string>
+#include <string_view>
 
 #ifndef SHMTU_CAS_SERVER_VERSION
 #define SHMTU_CAS_SERVER_VERSION "2.0.0"
@@ -27,11 +30,21 @@ static void print_banner() {
     std::printf("ShangHai Maritime University\n");
     std::printf("  SHMTU CAS OCR Server V%s\n", SHMTU_CAS_SERVER_VERSION);
     std::printf("  Author: Haomin Kong\n");
-    std::printf("  C++20 | RESTful API + TCP\n");
+    std::printf("  C++23 | RESTful API + TCP\n");
     std::printf("\n");
 }
 
-static shmtu::cas::ocr::ServerConfig parse_args(int argc, char* argv[]) {
+template <typename Int>
+static std::expected<Int, std::string> parse_integer_arg(std::string_view value, std::string_view name) {
+    Int parsed{};
+    const auto [ptr, ec] = std::from_chars(value.data(), value.data() + value.size(), parsed);
+    if (ec != std::errc{} || ptr != value.data() + value.size()) {
+        return std::unexpected("Invalid value for " + std::string(name) + ": " + std::string(value));
+    }
+    return parsed;
+}
+
+static std::expected<shmtu::cas::ocr::ServerConfig, std::string> parse_args(int argc, char* argv[]) {
     shmtu::cas::ocr::ServerConfig config;
 
     for (int i = 1; i < argc; ++i) {
@@ -50,23 +63,55 @@ static shmtu::cas::ocr::ServerConfig parse_args(int argc, char* argv[]) {
             std::printf("  --help, -h              Show this help\n");
             std::exit(0);
         } else if (arg == "--http-port" && i + 1 < argc) {
-            config.http_port = std::stoi(argv[++i]);
+            auto parsed = parse_integer_arg<int>(argv[i + 1], "http-port");
+            if (!parsed) {
+                return std::unexpected(parsed.error());
+            }
+            config.http_port = *parsed;
+            ++i;
         } else if (arg == "--tcp-port" && i + 1 < argc) {
-            config.tcp_port = std::stoi(argv[++i]);
+            auto parsed = parse_integer_arg<int>(argv[i + 1], "tcp-port");
+            if (!parsed) {
+                return std::unexpected(parsed.error());
+            }
+            config.tcp_port = *parsed;
+            ++i;
         } else if (arg == "--model-dir" && i + 1 < argc) {
             config.model_dir = argv[++i];
         } else if (arg == "--precision" && i + 1 < argc) {
             config.precision = argv[++i];
         } else if (arg == "--workers" && i + 1 < argc) {
-            config.worker_count = std::stoi(argv[++i]);
+            auto parsed = parse_integer_arg<int>(argv[i + 1], "workers");
+            if (!parsed) {
+                return std::unexpected(parsed.error());
+            }
+            config.worker_count = *parsed;
+            ++i;
         } else if (arg == "--use-gpu") {
             config.use_gpu = true;
         } else if (arg == "--queue-capacity" && i + 1 < argc) {
-            config.queue_capacity = std::stoi(argv[++i]);
+            auto parsed = parse_integer_arg<int>(argv[i + 1], "queue-capacity");
+            if (!parsed) {
+                return std::unexpected(parsed.error());
+            }
+            config.queue_capacity = *parsed;
+            ++i;
         } else {
-            std::fprintf(stderr, "Unknown argument: %s\nUse --help for usage.\n", arg.c_str());
-            std::exit(1);
+            return std::unexpected("Unknown argument: " + arg);
         }
+    }
+
+    if (config.precision != "fp16" && config.precision != "fp32") {
+        return std::unexpected("Unsupported precision: " + config.precision);
+    }
+    if (config.http_port <= 0 || config.tcp_port <= 0) {
+        return std::unexpected("Ports must be positive integers");
+    }
+    if (config.worker_count <= 0) {
+        return std::unexpected("Worker count must be positive");
+    }
+    if (config.queue_capacity <= 0) {
+        return std::unexpected("Queue capacity must be positive");
     }
 
     return config;
@@ -76,22 +121,26 @@ int main(int argc, char* argv[]) {
     print_banner();
 
     auto config = parse_args(argc, argv);
+    if (!config) {
+        std::fprintf(stderr, "Error: %s\nUse --help for usage.\n", config.error().c_str());
+        return 1;
+    }
 
     std::printf("Configuration:\n");
-    std::printf("  HTTP port:      %d\n", config.http_port);
-    std::printf("  TCP port:       %d\n", config.tcp_port);
-    std::printf("  Model dir:      %s\n", config.model_dir.c_str());
-    std::printf("  Precision:      %s\n", config.precision.c_str());
-    std::printf("  Workers:        %d\n", config.worker_count);
-    std::printf("  Use GPU:        %s\n", config.use_gpu ? "true" : "false");
-    std::printf("  Queue capacity: %d\n", config.queue_capacity);
+    std::printf("  HTTP port:      %d\n", config->http_port);
+    std::printf("  TCP port:       %d\n", config->tcp_port);
+    std::printf("  Model dir:      %s\n", config->model_dir.c_str());
+    std::printf("  Precision:      %s\n", config->precision.c_str());
+    std::printf("  Workers:        %d\n", config->worker_count);
+    std::printf("  Use GPU:        %s\n", config->use_gpu ? "true" : "false");
+    std::printf("  Queue capacity: %d\n", config->queue_capacity);
 
 #ifdef NCNN_SUPPORT_VULKAN
-    if (config.use_gpu) {
+    if (config->use_gpu) {
         int gpu_count = shmtu::cas::ocr::CasOcr::gpu_count();
         if (gpu_count == 0) {
             std::fprintf(stderr, "WARNING: GPU requested but no Vulkan devices found. Falling back to CPU.\n");
-            config.use_gpu = false;
+            config->use_gpu = false;
         } else {
             std::printf("\nGPU Devices (%d):\n", gpu_count);
             auto gpus = shmtu::cas::ocr::CasOcr::all_gpu_info();
@@ -106,7 +155,7 @@ int main(int argc, char* argv[]) {
 
     std::printf("\n");
 
-    shmtu::cas::ocr::OcrServer server(config);
+    shmtu::cas::ocr::OcrServer server(*config);
     g_server = &server;
 
     std::signal(SIGINT, signal_handler);

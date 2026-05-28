@@ -3,7 +3,9 @@
 #include "types.h"
 
 #include <memory>
+#include <span>
 #include <string>
+#include <string_view>
 #include <vector>
 
 // Forward declarations to avoid exposing OpenCV in the public header
@@ -27,7 +29,7 @@ class CasOcr {
 public:
     // Construct an OCR engine.
     // model_dir: directory containing .param/.bin model files.
-    explicit CasOcr(const std::string& model_dir = "");
+    explicit CasOcr(std::string model_dir = "");
 
     ~CasOcr();
 
@@ -41,7 +43,7 @@ public:
     // precision: "fp16" or "fp32". Defaults to "fp16".
     // use_gpu:   attempt to use GPU (Vulkan) acceleration if available.
     // Returns true if all three models loaded successfully.
-    bool load_model(const std::string& precision = "fp16", bool use_gpu = false);
+    bool load_model(std::string_view precision = "fp16", bool use_gpu = false);
 
     // Release loaded models and free GPU resources.
     void release();
@@ -55,11 +57,11 @@ public:
     PredictResult predict(const cv::Mat& image);
 
     // Predict CAPTCHA from an image file on disk.
-    PredictResult predict(const std::string& image_path);
+    PredictResult predict(std::string_view image_path);
 
     // Predict CAPTCHA from raw image bytes in memory.
     // Supports JPEG, PNG, BMP, etc. (anything OpenCV can decode).
-    PredictResult predict(const std::vector<uint8_t>& image_data);
+    PredictResult predict(std::span<const uint8_t> image_data);
 
     // --- Static GPU / Vulkan helpers ---
 

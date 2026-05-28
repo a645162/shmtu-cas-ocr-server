@@ -6,8 +6,8 @@ vcpkg_installed/
 /.vscode
 
 build/
-
 build*/
+tmp/
 
 # Models
 *.bin

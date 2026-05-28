@@ -1,153 +1,35 @@
-// SHMTU CAS OCR CLI — Command-line tool for CAPTCHA OCR recognition
-// Supports single image, directory batch, JSON output, and server comparison mode
+// SHMTU CAS OCR CLI — local/remote/compare modes with C++23-style plumbing
 
 #include <shmtu/cas_ocr/cas_ocr.h>
 
-#include <cstdio>
-#include <filesystem>
-#include <string>
-#include <cctype>
-#include <cstdlib>
-#include <chrono>
-#include <functional>
-#include <vector>
-#include <algorithm>
-#include <numeric>
-
-// cpp-httplib for HTTP client mode
 #include <httplib.h>
 
-// nlohmann/json is bundled with Drogon; we use a minimal hand-rolled parser
-// for the server response to keep CLI independent of Drogon.
-// For full JSON parsing we include a tiny inline implementation.
+#include <algorithm>
+#include <array>
+#include <cctype>
+#include <charconv>
+#include <cstdio>
+#include <cstdlib>
+#include <expected>
+#include <filesystem>
+#include <fstream>
+#include <functional>
+#include <numeric>
+#include <ranges>
+#include <span>
+#include <string>
+#include <string_view>
+#include <vector>
 
 namespace fs = std::filesystem;
 
 #ifndef SHMTU_CAS_CLI_VERSION
-#define SHMTU_CAS_CLI_VERSION "2.1.0"
+#define SHMTU_CAS_CLI_VERSION "2.2.0"
 #endif
 
-// ===========================================================================
-// Minimal JSON string extraction (no external dependency)
-// ===========================================================================
+namespace {
 
-namespace json_util {
-
-// Extract a string value for a given key from a JSON object string.
-// Returns "" if key not found or value is not a string.
-static std::string extract_string(const std::string& json, const std::string& key) {
-    auto pos = json.find("\"" + key + "\"");
-    if (pos == std::string::npos) return "";
-
-    // Find the colon after the key
-    pos = json.find(':', pos + key.size() + 2);
-    if (pos == std::string::npos) return "";
-
-    // Skip whitespace
-    pos++;
-    while (pos < json.size() && (json[pos] == ' ' || json[pos] == '\t' || json[pos] == '\n' || json[pos] == '\r'))
-        pos++;
-
-    if (pos >= json.size() || json[pos] != '"') return "";
-
-    // Extract string content (handle escapes minimally)
-    std::string result;
-    pos++; // skip opening quote
-    while (pos < json.size() && json[pos] != '"') {
-        if (json[pos] == '\\' && pos + 1 < json.size()) {
-            pos++; // skip backslash
-            switch (json[pos]) {
-                case '"':  result += '"'; break;
-                case '\\': result += '\\'; break;
-                case 'n':  result += '\n'; break;
-                case 'r':  result += '\r'; break;
-                case 't':  result += '\t'; break;
-                default:   result += json[pos]; break;
-            }
-        } else {
-            result += json[pos];
-        }
-        pos++;
-    }
-    return result;
-}
-
-// Extract an integer value for a given key from a JSON object string.
-// Returns 0 if key not found or value is not a number.
-static int extract_int(const std::string& json, const std::string& key) {
-    auto pos = json.find("\"" + key + "\"");
-    if (pos == std::string::npos) return 0;
-
-    pos = json.find(':', pos + key.size() + 2);
-    if (pos == std::string::npos) return 0;
-
-    pos++;
-    while (pos < json.size() && (json[pos] == ' ' || json[pos] == '\t')) pos++;
-
-    std::string num_str;
-    while (pos < json.size() && (json[pos] == '-' || (json[pos] >= '0' && json[pos] <= '9'))) {
-        num_str += json[pos];
-        pos++;
-    }
-    if (num_str.empty()) return 0;
-    return std::atoi(num_str.c_str());
-}
-
-// Extract a boolean value for a given key from a JSON object string.
-static bool extract_bool(const std::string& json, const std::string& key) {
-    auto pos = json.find("\"" + key + "\"");
-    if (pos == std::string::npos) return false;
-
-    pos = json.find(':', pos + key.size() + 2);
-    if (pos == std::string::npos) return false;
-
-    pos++;
-    while (pos < json.size() && (json[pos] == ' ' || json[pos] == '\t')) pos++;
-
-    if (pos + 3 < json.size() && json.substr(pos, 4) == "true") return true;
-    return false;
-}
-
-} // namespace json_util
-
-// ===========================================================================
-// Base64 encoding for HTTP client mode
-// ===========================================================================
-
-static const char kBase64Table[] =
-    "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
-
-static std::string base64_encode(const std::vector<uint8_t>& data) {
-    std::string result;
-    result.reserve(((data.size() + 2) / 3) * 4);
-
-    size_t i = 0;
-    for (; i + 2 < data.size(); i += 3) {
-        uint32_t n = (static_cast<uint32_t>(data[i]) << 16) |
-                     (static_cast<uint32_t>(data[i + 1]) << 8) |
-                     static_cast<uint32_t>(data[i + 2]);
-        result += kBase64Table[(n >> 18) & 0x3F];
-        result += kBase64Table[(n >> 12) & 0x3F];
-        result += kBase64Table[(n >> 6) & 0x3F];
-        result += kBase64Table[n & 0x3F];
-    }
-
-    if (i < data.size()) {
-        uint32_t n = static_cast<uint32_t>(data[i]) << 16;
-        if (i + 1 < data.size()) n |= static_cast<uint32_t>(data[i + 1]) << 8;
-
-        result += kBase64Table[(n >> 18) & 0x3F];
-        result += kBase64Table[(n >> 12) & 0x3F];
-        result += (i + 1 < data.size()) ? kBase64Table[(n >> 6) & 0x3F] : '=';
-        result += '=';
-    }
-
-    return result;
-}
-
-// ===========================================================================
-// Remote OCR result (parsed from server JSON response)
-// ===========================================================================
+using ByteBuffer = std::vector<uint8_t>;
 
 struct RemoteOcrResult {
     bool success = false;
@@ -159,12 +41,8 @@ struct RemoteOcrResult {
     int digit2 = 0;
     std::string error;
     int http_status = 0;
-    bool request_ok = false; // whether HTTP request itself succeeded
+    bool request_ok = false;
 };
-
-// ===========================================================================
-// CLI configuration
-// ===========================================================================
 
 struct CliConfig {
     std::string model_dir = "./models";
@@ -172,309 +50,11 @@ struct CliConfig {
     bool use_gpu = false;
     bool json_output = false;
     std::string input_path;
-
-    // HTTP client mode
     std::string server_host;
-    int server_port = 21600; // default HTTP port for C++ server
+    int server_port = 21600;
     bool server_mode = false;
-
-    // Compare mode
     bool compare_mode = false;
 };
-
-// ===========================================================================
-// Banner and usage
-// ===========================================================================
-
-static void print_banner() {
-    printf("SHMTU CAS OCR CLI V%s\n", SHMTU_CAS_CLI_VERSION);
-}
-
-static void print_usage(const char* prog) {
-    printf("Usage: %s [OPTIONS] <image_path_or_directory>\n\n", prog);
-    printf("Options:\n");
-    printf("  --model-dir <path>       Model directory (default: ./models)\n");
-    printf("  --precision <fp16|fp32>  Model precision (default: fp16)\n");
-    printf("  --use-gpu                Enable GPU acceleration\n");
-    printf("  --json                   Output results as JSON\n");
-    printf("  --server <host:port>     Use remote OCR server instead of local model\n");
-    printf("  --compare                Compare local OCR vs remote server results\n");
-    printf("  --help, -h               Show this help\n");
-    printf("\n");
-    printf("Modes:\n");
-    printf("  Local mode (default):\n");
-    printf("    Load ONNX models locally and run OCR inference.\n");
-    printf("\n");
-    printf("  Server mode (--server):\n");
-    printf("    Send images to a remote OCR server via HTTP API.\n");
-    printf("    No local model files required.\n");
-    printf("\n");
-    printf("  Compare mode (--server + --compare):\n");
-    printf("    Run both local OCR and remote API, then compare results.\n");
-    printf("\n");
-    printf("Examples:\n");
-    printf("  %s captcha.png\n", prog);
-    printf("  %s --json ./captcha_images/\n", prog);
-    printf("  %s --server 127.0.0.1:21600 captcha.png\n", prog);
-    printf("  %s --server 127.0.0.1:21600 --compare ./captcha_images/\n", prog);
-    printf("  %s --model-dir /opt/models --precision fp32 image.jpg\n", prog);
-}
-
-// ===========================================================================
-// Argument parsing
-// ===========================================================================
-
-static CliConfig parse_args(int argc, char* argv[]) {
-    CliConfig config;
-
-    for (int i = 1; i < argc; ++i) {
-        std::string arg = argv[i];
-
-        if (arg == "--help" || arg == "-h") {
-            print_usage(argv[0]);
-            exit(0);
-        } else if (arg == "--model-dir" && i + 1 < argc) {
-            config.model_dir = argv[++i];
-        } else if (arg == "--precision" && i + 1 < argc) {
-            config.precision = argv[++i];
-        } else if (arg == "--use-gpu") {
-            config.use_gpu = true;
-        } else if (arg == "--json") {
-            config.json_output = true;
-        } else if (arg == "--server" && i + 1 < argc) {
-            std::string server_arg = argv[++i];
-            config.server_mode = true;
-            // Parse host:port
-            auto colon_pos = server_arg.rfind(':');
-            if (colon_pos != std::string::npos) {
-                config.server_host = server_arg.substr(0, colon_pos);
-                config.server_port = std::atoi(server_arg.substr(colon_pos + 1).c_str());
-                if (config.server_port <= 0) config.server_port = 21600;
-            } else {
-                config.server_host = server_arg;
-                config.server_port = 21600;
-            }
-        } else if (arg == "--compare") {
-            config.compare_mode = true;
-        } else if (arg[0] != '-') {
-            config.input_path = arg;
-        } else {
-            fprintf(stderr, "Unknown argument: %s\nUse --help for usage.\n", arg.c_str());
-            exit(1);
-        }
-    }
-
-    // --compare requires --server
-    if (config.compare_mode && !config.server_mode) {
-        fprintf(stderr, "Error: --compare requires --server to be specified.\n\n");
-        print_usage(argv[0]);
-        exit(1);
-    }
-
-    return config;
-}
-
-// ===========================================================================
-// JSON helpers for local results
-// ===========================================================================
-
-static std::string json_escape(const std::string& s) {
-    std::string out;
-    out.reserve(s.size());
-    for (char c : s) {
-        switch (c) {
-            case '"':  out += "\\\""; break;
-            case '\\': out += "\\\\"; break;
-            case '\n': out += "\\n";  break;
-            case '\r': out += "\\r";  break;
-            case '\t': out += "\\t";  break;
-            default:   out += c;      break;
-        }
-    }
-    return out;
-}
-
-static std::string predict_result_to_json(const shmtu::cas::ocr::PredictResult& r) {
-    std::string json = "{";
-    json += "\"success\":" + std::string(r.success ? "true" : "false") + ",";
-    json += "\"expression\":\"" + json_escape(r.expression) + "\",";
-    json += "\"result\":" + std::to_string(r.result) + ",";
-    json += "\"equalSymbol\":" + std::to_string(r.equal_symbol) + ",";
-    json += "\"operator\":" + std::to_string(r.op) + ",";
-    json += "\"digit1\":" + std::to_string(r.digit1) + ",";
-    json += "\"digit2\":" + std::to_string(r.digit2);
-    if (!r.error.empty()) {
-        json += ",\"error\":\"" + json_escape(r.error) + "\"";
-    }
-    json += "}";
-    return json;
-}
-
-static std::string remote_result_to_json(const RemoteOcrResult& r) {
-    std::string json = "{";
-    json += "\"success\":" + std::string(r.success ? "true" : "false") + ",";
-    json += "\"expression\":\"" + json_escape(r.expression) + "\",";
-    json += "\"result\":" + std::to_string(r.result) + ",";
-    json += "\"equalSymbol\":" + std::to_string(r.equal_symbol) + ",";
-    json += "\"operator\":" + std::to_string(r.op) + ",";
-    json += "\"digit1\":" + std::to_string(r.digit1) + ",";
-    json += "\"digit2\":" + std::to_string(r.digit2);
-    if (!r.error.empty()) {
-        json += ",\"error\":\"" + json_escape(r.error) + "\"";
-    }
-    if (!r.request_ok) {
-        json += ",\"httpError\":\"request failed\"";
-    } else if (r.http_status != 200) {
-        json += ",\"httpStatus\":" + std::to_string(r.http_status);
-    }
-    json += "}";
-    return json;
-}
-
-// ===========================================================================
-// HTTP client: call remote OCR server
-// ===========================================================================
-
-static RemoteOcrResult call_remote_ocr(
-    const std::string& host,
-    int port,
-    const std::vector<uint8_t>& image_bytes,
-    int timeout_sec = 30
-) {
-    RemoteOcrResult result;
-
-    try {
-        httplib::Client cli(host, port);
-        cli.set_connection_timeout(timeout_sec);
-        cli.set_read_timeout(timeout_sec);
-
-        std::string b64 = base64_encode(image_bytes);
-        std::string body = "{\"imageBase64\":\"" + b64 + "\"}";
-
-        auto res = cli.Post("/api/ocr", body, "application/json");
-
-        if (!res) {
-            result.request_ok = false;
-            result.error = "HTTP request failed: " + std::to_string(static_cast<int>(res.error()));
-            return result;
-        }
-
-        result.request_ok = true;
-        result.http_status = res->status;
-
-        if (res->status != 200) {
-            result.error = "HTTP " + std::to_string(res->status);
-            // Try to extract error message from response body
-            auto err_msg = json_util::extract_string(res->body, "error");
-            if (!err_msg.empty()) {
-                result.error += ": " + err_msg;
-            }
-            return result;
-        }
-
-        // Parse JSON response
-        result.success = json_util::extract_bool(res->body, "success");
-        result.expression = json_util::extract_string(res->body, "expression");
-        result.result = json_util::extract_int(res->body, "result");
-        result.equal_symbol = json_util::extract_int(res->body, "equalSymbol");
-        result.op = json_util::extract_int(res->body, "operator");
-        result.digit1 = json_util::extract_int(res->body, "digit1");
-        result.digit2 = json_util::extract_int(res->body, "digit2");
-        result.error = json_util::extract_string(res->body, "error");
-
-    } catch (const std::exception& e) {
-        result.request_ok = false;
-        result.error = std::string("Exception: ") + e.what();
-    }
-
-    return result;
-}
-
-static RemoteOcrResult call_remote_ocr_file(
-    const std::string& host,
-    int port,
-    const std::string& file_path,
-    int timeout_sec = 30
-) {
-    // Read file into memory, then send as base64
-    FILE* f = fopen(file_path.c_str(), "rb");
-    if (!f) {
-        RemoteOcrResult result;
-        result.request_ok = false;
-        result.error = "Cannot open file: " + file_path;
-        return result;
-    }
-
-    fseek(f, 0, SEEK_END);
-    long size = ftell(f);
-    fseek(f, 0, SEEK_SET);
-
-    std::vector<uint8_t> data(size);
-    if (size > 0) {
-        auto read_bytes = fread(data.data(), 1, static_cast<size_t>(size), f);
-        (void)read_bytes;
-    }
-    fclose(f);
-
-    return call_remote_ocr(host, port, data, timeout_sec);
-}
-
-// ===========================================================================
-// Local OCR processing
-// ===========================================================================
-
-static void process_image_local(
-    shmtu::cas::ocr::CasOcr& ocr,
-    const std::string& path,
-    bool json_output
-) {
-    auto result = ocr.predict(path);
-
-    if (json_output) {
-        printf("{\"file\":\"%s\",\"result\":%s}\n",
-               json_escape(path).c_str(),
-               predict_result_to_json(result).c_str());
-    } else {
-        if (result.success) {
-            printf("[%s] %s  =>  %d\n",
-                   path.c_str(), result.expression.c_str(), result.result);
-        } else {
-            fprintf(stderr, "[%s] ERROR: %s\n",
-                    path.c_str(), result.error.c_str());
-        }
-    }
-}
-
-// ===========================================================================
-// Remote OCR processing (server mode)
-// ===========================================================================
-
-static void process_image_remote(
-    const std::string& host,
-    int port,
-    const std::string& path,
-    bool json_output
-) {
-    auto result = call_remote_ocr_file(host, port, path);
-
-    if (json_output) {
-        printf("{\"file\":\"%s\",\"result\":%s}\n",
-               json_escape(path).c_str(),
-               remote_result_to_json(result).c_str());
-    } else {
-        if (result.request_ok && result.success) {
-            printf("[%s] %s  =>  %d  (remote)\n",
-                   path.c_str(), result.expression.c_str(), result.result);
-        } else {
-            fprintf(stderr, "[%s] ERROR: %s  (remote)\n",
-                    path.c_str(), result.error.c_str());
-        }
-    }
-}
-
-// ===========================================================================
-// Compare mode: local vs remote
-// ===========================================================================
 
 struct CompareEntry {
     std::string file_path;
@@ -484,121 +64,566 @@ struct CompareEntry {
     bool remote_ok = false;
 };
 
-static void print_compare_header() {
-    printf("%-40s  %-8s  %-8s  %-6s  %-6s  %s\n",
-           "File", "Local", "Remote", "L-Res", "R-Res", "Match");
-    printf("%-40s  %-8s  %-8s  %-6s  %-6s  %s\n",
-           std::string(40, '-').c_str(),
-           std::string(8, '-').c_str(),
-           std::string(8, '-').c_str(),
-           std::string(6, '-').c_str(),
-           std::string(6, '-').c_str(),
-           std::string(5, '-').c_str());
+template <typename Int>
+std::expected<Int, std::string> parse_integer(std::string_view value, std::string_view name) {
+    Int parsed{};
+    const auto [ptr, ec] = std::from_chars(value.data(), value.data() + value.size(), parsed);
+    if (ec != std::errc{} || ptr != value.data() + value.size()) {
+        return std::unexpected("Invalid value for " + std::string(name) + ": " + std::string(value));
+    }
+    return parsed;
 }
 
-static void print_compare_entry(const CompareEntry& entry) {
-    std::string local_expr = entry.local_ok ? entry.local_result.expression : "FAILED";
-    std::string remote_expr = entry.remote_ok ? entry.remote_result.expression : "FAILED";
-    std::string local_res = entry.local_ok ? std::to_string(entry.local_result.result) : "-";
-    std::string remote_res = entry.remote_ok ? std::to_string(entry.remote_result.result) : "-";
-
-    bool match = false;
-    if (entry.local_ok && entry.remote_ok) {
-        match = (entry.local_result.expression == entry.remote_result.expression &&
-                 entry.local_result.result == entry.remote_result.result);
+std::expected<std::pair<std::string, int>, std::string> parse_server_endpoint(
+    std::string_view endpoint) {
+    const auto colon_pos = endpoint.rfind(':');
+    if (colon_pos == std::string_view::npos) {
+        return std::pair<std::string, int>{std::string(endpoint), 21600};
     }
 
-    // Truncate file path for display
+    auto port = parse_integer<int>(endpoint.substr(colon_pos + 1), "server port");
+    if (!port || *port <= 0) {
+        return std::unexpected(port ? "Server port must be positive" : port.error());
+    }
+
+    return std::pair<std::string, int>{std::string(endpoint.substr(0, colon_pos)), *port};
+}
+
+void print_banner() {
+    std::printf("SHMTU CAS OCR CLI V%s\n", SHMTU_CAS_CLI_VERSION);
+}
+
+void print_usage(const char* prog) {
+    std::printf("Usage: %s [OPTIONS] <image_path_or_directory>\n\n", prog);
+    std::printf("Options:\n");
+    std::printf("  --model-dir <path>       Model directory (default: ./models)\n");
+    std::printf("  --precision <fp16|fp32>  Model precision (default: fp16)\n");
+    std::printf("  --use-gpu                Enable GPU acceleration\n");
+    std::printf("  --json                   Output results as JSON\n");
+    std::printf("  --server <host:port>     Use remote OCR server instead of local model\n");
+    std::printf("  --compare                Compare local OCR vs remote server results\n");
+    std::printf("  --help, -h               Show this help\n\n");
+    std::printf("Examples:\n");
+    std::printf("  %s captcha.png\n", prog);
+    std::printf("  %s --json ./captcha_images/\n", prog);
+    std::printf("  %s --server 127.0.0.1:21600 captcha.png\n", prog);
+    std::printf("  %s --server 127.0.0.1:21600 --compare ./captcha_images/\n", prog);
+}
+
+std::expected<CliConfig, std::string> parse_args(int argc, char* argv[]) {
+    CliConfig config;
+
+    for (int i = 1; i < argc; ++i) {
+        const std::string_view arg = argv[i];
+
+        if (arg == "--help" || arg == "-h") {
+            print_usage(argv[0]);
+            std::exit(0);
+        }
+
+        if (arg == "--model-dir" && i + 1 < argc) {
+            config.model_dir = argv[++i];
+            continue;
+        }
+        if (arg == "--precision" && i + 1 < argc) {
+            config.precision = argv[++i];
+            continue;
+        }
+        if (arg == "--use-gpu") {
+            config.use_gpu = true;
+            continue;
+        }
+        if (arg == "--json") {
+            config.json_output = true;
+            continue;
+        }
+        if (arg == "--server" && i + 1 < argc) {
+            auto endpoint = parse_server_endpoint(argv[++i]);
+            if (!endpoint) {
+                return std::unexpected(endpoint.error());
+            }
+            auto& [host, port] = *endpoint;
+            config.server_host = std::move(host);
+            config.server_port = port;
+            config.server_mode = true;
+            continue;
+        }
+        if (arg == "--compare") {
+            config.compare_mode = true;
+            continue;
+        }
+        if (!arg.empty() && arg.front() != '-') {
+            config.input_path = std::string(arg);
+            continue;
+        }
+
+        return std::unexpected("Unknown argument: " + std::string(arg));
+    }
+
+    if (config.precision != "fp16" && config.precision != "fp32") {
+        return std::unexpected("Unsupported precision: " + config.precision);
+    }
+    if (config.compare_mode && !config.server_mode) {
+        return std::unexpected("--compare requires --server");
+    }
+    if (config.input_path.empty()) {
+        return std::unexpected("No input path specified");
+    }
+
+    return config;
+}
+
+namespace json_util {
+
+std::string extract_string(std::string_view json, std::string_view key) {
+    const auto key_token = "\"" + std::string(key) + "\"";
+    auto pos = json.find(key_token);
+    if (pos == std::string_view::npos) {
+        return {};
+    }
+
+    pos = json.find(':', pos + key_token.size());
+    if (pos == std::string_view::npos) {
+        return {};
+    }
+
+    ++pos;
+    while (pos < json.size() && std::isspace(static_cast<unsigned char>(json[pos]))) {
+        ++pos;
+    }
+    if (pos >= json.size() || json[pos] != '"') {
+        return {};
+    }
+
+    std::string result;
+    for (++pos; pos < json.size() && json[pos] != '"'; ++pos) {
+        if (json[pos] == '\\' && pos + 1 < json.size()) {
+            ++pos;
+            switch (json[pos]) {
+                case '"': result.push_back('"'); break;
+                case '\\': result.push_back('\\'); break;
+                case 'n': result.push_back('\n'); break;
+                case 'r': result.push_back('\r'); break;
+                case 't': result.push_back('\t'); break;
+                default: result.push_back(json[pos]); break;
+            }
+        } else {
+            result.push_back(json[pos]);
+        }
+    }
+
+    return result;
+}
+
+int extract_int(std::string_view json, std::string_view key) {
+    const auto key_token = "\"" + std::string(key) + "\"";
+    auto pos = json.find(key_token);
+    if (pos == std::string_view::npos) {
+        return 0;
+    }
+
+    pos = json.find(':', pos + key_token.size());
+    if (pos == std::string_view::npos) {
+        return 0;
+    }
+
+    ++pos;
+    while (pos < json.size() && std::isspace(static_cast<unsigned char>(json[pos]))) {
+        ++pos;
+    }
+
+    std::string value;
+    while (pos < json.size() &&
+           (json[pos] == '-' || std::isdigit(static_cast<unsigned char>(json[pos])))) {
+        value.push_back(json[pos++]);
+    }
+
+    if (value.empty()) {
+        return 0;
+    }
+
+    return std::atoi(value.c_str());
+}
+
+bool extract_bool(std::string_view json, std::string_view key) {
+    const auto key_token = "\"" + std::string(key) + "\"";
+    auto pos = json.find(key_token);
+    if (pos == std::string_view::npos) {
+        return false;
+    }
+
+    pos = json.find(':', pos + key_token.size());
+    if (pos == std::string_view::npos) {
+        return false;
+    }
+
+    ++pos;
+    while (pos < json.size() && std::isspace(static_cast<unsigned char>(json[pos]))) {
+        ++pos;
+    }
+
+    return json.substr(pos, 4) == "true";
+}
+
+}  // namespace json_util
+
+std::string json_escape(std::string_view input) {
+    std::string escaped;
+    escaped.reserve(input.size());
+    for (const auto ch : input) {
+        switch (ch) {
+            case '"': escaped += "\\\""; break;
+            case '\\': escaped += "\\\\"; break;
+            case '\n': escaped += "\\n"; break;
+            case '\r': escaped += "\\r"; break;
+            case '\t': escaped += "\\t"; break;
+            default: escaped.push_back(ch); break;
+        }
+    }
+    return escaped;
+}
+
+std::string predict_result_to_json(const shmtu::cas::ocr::PredictResult& result) {
+    std::string json = "{";
+    json += "\"success\":" + std::string(result.success ? "true" : "false") + ",";
+    json += "\"expression\":\"" + json_escape(result.expression) + "\",";
+    json += "\"result\":" + std::to_string(result.result) + ",";
+    json += "\"equalSymbol\":" + std::to_string(result.equal_symbol) + ",";
+    json += "\"operator\":" + std::to_string(result.op) + ",";
+    json += "\"digit1\":" + std::to_string(result.digit1) + ",";
+    json += "\"digit2\":" + std::to_string(result.digit2);
+    if (!result.error.empty()) {
+        json += ",\"error\":\"" + json_escape(result.error) + "\"";
+    }
+    json += "}";
+    return json;
+}
+
+std::string remote_result_to_json(const RemoteOcrResult& result) {
+    std::string json = "{";
+    json += "\"success\":" + std::string(result.success ? "true" : "false") + ",";
+    json += "\"expression\":\"" + json_escape(result.expression) + "\",";
+    json += "\"result\":" + std::to_string(result.result) + ",";
+    json += "\"equalSymbol\":" + std::to_string(result.equal_symbol) + ",";
+    json += "\"operator\":" + std::to_string(result.op) + ",";
+    json += "\"digit1\":" + std::to_string(result.digit1) + ",";
+    json += "\"digit2\":" + std::to_string(result.digit2);
+    if (!result.error.empty()) {
+        json += ",\"error\":\"" + json_escape(result.error) + "\"";
+    }
+    if (!result.request_ok) {
+        json += ",\"httpError\":\"request failed\"";
+    } else if (result.http_status != 200) {
+        json += ",\"httpStatus\":" + std::to_string(result.http_status);
+    }
+    json += "}";
+    return json;
+}
+
+constexpr std::string_view kBase64Table =
+    "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+
+std::string base64_encode(std::span<const uint8_t> data) {
+    std::string result;
+    result.reserve(((data.size() + 2) / 3) * 4);
+
+    size_t i = 0;
+    for (; i + 2 < data.size(); i += 3) {
+        const uint32_t n = (static_cast<uint32_t>(data[i]) << 16) |
+                           (static_cast<uint32_t>(data[i + 1]) << 8) |
+                           static_cast<uint32_t>(data[i + 2]);
+        result += kBase64Table[(n >> 18) & 0x3F];
+        result += kBase64Table[(n >> 12) & 0x3F];
+        result += kBase64Table[(n >> 6) & 0x3F];
+        result += kBase64Table[n & 0x3F];
+    }
+
+    if (i < data.size()) {
+        uint32_t n = static_cast<uint32_t>(data[i]) << 16;
+        if (i + 1 < data.size()) {
+            n |= static_cast<uint32_t>(data[i + 1]) << 8;
+        }
+        result += kBase64Table[(n >> 18) & 0x3F];
+        result += kBase64Table[(n >> 12) & 0x3F];
+        result += (i + 1 < data.size()) ? kBase64Table[(n >> 6) & 0x3F] : '=';
+        result += '=';
+    }
+
+    return result;
+}
+
+std::expected<ByteBuffer, std::string> read_binary_file(const fs::path& path) {
+    std::ifstream input(path, std::ios::binary | std::ios::ate);
+    if (!input) {
+        return std::unexpected("Cannot open file: " + path.string());
+    }
+
+    const auto file_size = input.tellg();
+    if (file_size < 0) {
+        return std::unexpected("Cannot determine file size: " + path.string());
+    }
+
+    ByteBuffer buffer(static_cast<size_t>(file_size));
+    input.seekg(0, std::ios::beg);
+    if (!buffer.empty()) {
+        input.read(reinterpret_cast<char*>(buffer.data()),
+                   static_cast<std::streamsize>(buffer.size()));
+    }
+
+    if (!input.good() && !input.eof()) {
+        return std::unexpected("Failed to read file: " + path.string());
+    }
+
+    return buffer;
+}
+
+RemoteOcrResult call_remote_ocr(const std::string& host,
+                                const int port,
+                                std::span<const uint8_t> image_bytes,
+                                const int timeout_sec = 30) {
+    RemoteOcrResult result;
+
+    try {
+        httplib::Client client(host, port);
+        client.set_connection_timeout(timeout_sec);
+        client.set_read_timeout(timeout_sec);
+
+        const std::string request_body =
+            "{\"imageBase64\":\"" + base64_encode(image_bytes) + "\"}";
+
+        auto response = client.Post("/api/ocr", request_body, "application/json");
+        if (!response) {
+            result.request_ok = false;
+            result.error =
+                "HTTP request failed: " + std::to_string(static_cast<int>(response.error()));
+            return result;
+        }
+
+        result.request_ok = true;
+        result.http_status = response->status;
+        if (response->status != 200) {
+            result.error = "HTTP " + std::to_string(response->status);
+            if (const auto error_message = json_util::extract_string(response->body, "error");
+                !error_message.empty()) {
+                result.error += ": " + error_message;
+            }
+            return result;
+        }
+
+        const std::string_view body = response->body;
+        result.success = json_util::extract_bool(body, "success");
+        result.expression = json_util::extract_string(body, "expression");
+        result.result = json_util::extract_int(body, "result");
+        result.equal_symbol = json_util::extract_int(body, "equalSymbol");
+        result.op = json_util::extract_int(body, "operator");
+        result.digit1 = json_util::extract_int(body, "digit1");
+        result.digit2 = json_util::extract_int(body, "digit2");
+        result.error = json_util::extract_string(body, "error");
+    } catch (const std::exception& exception) {
+        result.request_ok = false;
+        result.error = std::string("Exception: ") + exception.what();
+    }
+
+    return result;
+}
+
+RemoteOcrResult call_remote_ocr_file(const std::string& host,
+                                     const int port,
+                                     const fs::path& path,
+                                     const int timeout_sec = 30) {
+    const auto file_data = read_binary_file(path);
+    if (!file_data) {
+        RemoteOcrResult result;
+        result.request_ok = false;
+        result.error = file_data.error();
+        return result;
+    }
+
+    return call_remote_ocr(host, port, *file_data, timeout_sec);
+}
+
+std::expected<void, std::string> check_remote_server(const CliConfig& config) {
+    try {
+        httplib::Client client(config.server_host, config.server_port);
+        client.set_connection_timeout(5);
+        client.set_read_timeout(5);
+        auto response = client.Get("/api/health");
+        if (response && response->status == 200) {
+            return {};
+        }
+        if (response) {
+            return std::unexpected("Health check returned HTTP " + std::to_string(response->status));
+        }
+        return std::unexpected("Health check connection error " +
+                               std::to_string(static_cast<int>(response.error())));
+    } catch (const std::exception& exception) {
+        return std::unexpected(exception.what());
+    }
+}
+
+bool is_image_file(const fs::path& path) {
+    auto extension = path.extension().string();
+    std::ranges::transform(extension, extension.begin(), [](const unsigned char ch) {
+        return static_cast<char>(std::tolower(ch));
+    });
+    return extension == ".png" || extension == ".jpg" || extension == ".jpeg" ||
+           extension == ".bmp" || extension == ".tif" || extension == ".tiff";
+}
+
+std::expected<std::vector<std::string>, std::string> collect_image_paths(const fs::path& input) {
+    std::vector<std::string> image_paths;
+
+    if (fs::is_directory(input)) {
+        for (const auto& entry : fs::directory_iterator(input)) {
+            if (entry.is_regular_file() && is_image_file(entry.path())) {
+                image_paths.push_back(entry.path().string());
+            }
+        }
+        std::ranges::sort(image_paths);
+    } else if (fs::exists(input)) {
+        image_paths.push_back(input.string());
+    } else {
+        return std::unexpected("Path does not exist: " + input.string());
+    }
+
+    if (image_paths.empty()) {
+        return std::unexpected("No image files found");
+    }
+
+    return image_paths;
+}
+
+void process_image_local(shmtu::cas::ocr::CasOcr& ocr,
+                         const std::string& path,
+                         const bool json_output) {
+    const auto result = ocr.predict(path);
+    if (json_output) {
+        std::printf("{\"file\":\"%s\",\"result\":%s}\n",
+                    json_escape(path).c_str(),
+                    predict_result_to_json(result).c_str());
+        return;
+    }
+
+    if (result.success) {
+        std::printf("[%s] %s  =>  %d\n", path.c_str(), result.expression.c_str(), result.result);
+    } else {
+        std::fprintf(stderr, "[%s] ERROR: %s\n", path.c_str(), result.error.c_str());
+    }
+}
+
+void process_image_remote(const std::string& host,
+                          const int port,
+                          const std::string& path,
+                          const bool json_output) {
+    const auto result = call_remote_ocr_file(host, port, path);
+    if (json_output) {
+        std::printf("{\"file\":\"%s\",\"result\":%s}\n",
+                    json_escape(path).c_str(),
+                    remote_result_to_json(result).c_str());
+        return;
+    }
+
+    if (result.request_ok && result.success) {
+        std::printf("[%s] %s  =>  %d  (remote)\n",
+                    path.c_str(), result.expression.c_str(), result.result);
+    } else {
+        std::fprintf(stderr, "[%s] ERROR: %s  (remote)\n", path.c_str(), result.error.c_str());
+    }
+}
+
+void print_compare_header() {
+    std::printf("%-40s  %-8s  %-8s  %-6s  %-6s  %s\n",
+                "File", "Local", "Remote", "L-Res", "R-Res", "Match");
+    std::printf("%-40s  %-8s  %-8s  %-6s  %-6s  %s\n",
+                std::string(40, '-').c_str(),
+                std::string(8, '-').c_str(),
+                std::string(8, '-').c_str(),
+                std::string(6, '-').c_str(),
+                std::string(6, '-').c_str(),
+                std::string(5, '-').c_str());
+}
+
+void print_compare_entry(const CompareEntry& entry) {
+    const auto local_expression = entry.local_ok ? entry.local_result.expression : "FAILED";
+    const auto remote_expression = entry.remote_ok ? entry.remote_result.expression : "FAILED";
+    const auto local_result = entry.local_ok ? std::to_string(entry.local_result.result) : "-";
+    const auto remote_result = entry.remote_ok ? std::to_string(entry.remote_result.result) : "-";
+    const auto match = entry.local_ok && entry.remote_ok &&
+                       entry.local_result.expression == entry.remote_result.expression &&
+                       entry.local_result.result == entry.remote_result.result;
+
     std::string display_path = entry.file_path;
     if (display_path.size() > 38) {
         display_path = "..." + display_path.substr(display_path.size() - 35);
     }
 
-    printf("%-40s  %-8s  %-8s  %-6s  %-6s  %s\n",
-           display_path.c_str(),
-           local_expr.c_str(),
-           remote_expr.c_str(),
-           local_res.c_str(),
-           remote_res.c_str(),
-           match ? "OK" : "DIFF");
+    std::printf("%-40s  %-8s  %-8s  %-6s  %-6s  %s\n",
+                display_path.c_str(),
+                local_expression.c_str(),
+                remote_expression.c_str(),
+                local_result.c_str(),
+                remote_result.c_str(),
+                match ? "OK" : "DIFF");
 }
 
-static void print_compare_summary(const std::vector<CompareEntry>& entries) {
-    int total = static_cast<int>(entries.size());
-    int both_ok = 0;
-    int match = 0;
-    int local_only = 0;
-    int remote_only = 0;
-    int both_fail = 0;
+void print_compare_summary(const std::vector<CompareEntry>& entries) {
+    const auto both_ok = static_cast<int>(std::ranges::count_if(entries, [](const auto& entry) {
+        return entry.local_ok && entry.remote_ok;
+    }));
+    const auto matching = static_cast<int>(std::ranges::count_if(entries, [](const auto& entry) {
+        return entry.local_ok && entry.remote_ok &&
+               entry.local_result.expression == entry.remote_result.expression &&
+               entry.local_result.result == entry.remote_result.result;
+    }));
+    const auto local_only = static_cast<int>(std::ranges::count_if(entries, [](const auto& entry) {
+        return entry.local_ok && !entry.remote_ok;
+    }));
+    const auto remote_only = static_cast<int>(std::ranges::count_if(entries, [](const auto& entry) {
+        return !entry.local_ok && entry.remote_ok;
+    }));
+    const auto both_fail = static_cast<int>(entries.size()) - both_ok - local_only - remote_only;
 
-    for (const auto& e : entries) {
-        if (e.local_ok && e.remote_ok) {
-            both_ok++;
-            if (e.local_result.expression == e.remote_result.expression &&
-                e.local_result.result == e.remote_result.result) {
-                match++;
-            }
-        } else if (e.local_ok && !e.remote_ok) {
-            local_only++;
-        } else if (!e.local_ok && e.remote_ok) {
-            remote_only++;
-        } else {
-            both_fail++;
-        }
-    }
-
-    printf("\n");
-    printf("=== Comparison Summary ===\n");
-    printf("Total images:     %d\n", total);
-    printf("Both succeeded:   %d\n", both_ok);
-    printf("  Matching:       %d\n", match);
-    printf("  Differing:      %d\n", both_ok - match);
-    printf("Local only OK:    %d\n", local_only);
-    printf("Remote only OK:   %d\n", remote_only);
-    printf("Both failed:      %d\n", both_fail);
-
+    std::printf("\n=== Comparison Summary ===\n");
+    std::printf("Total images:     %zu\n", entries.size());
+    std::printf("Both succeeded:   %d\n", both_ok);
+    std::printf("  Matching:       %d\n", matching);
+    std::printf("  Differing:      %d\n", both_ok - matching);
+    std::printf("Local only OK:    %d\n", local_only);
+    std::printf("Remote only OK:   %d\n", remote_only);
+    std::printf("Both failed:      %d\n", both_fail);
     if (both_ok > 0) {
-        printf("Consistency rate: %.1f%% (%d/%d)\n",
-               100.0 * match / both_ok, match, both_ok);
+        std::printf("Consistency rate: %.1f%% (%d/%d)\n", 100.0 * matching / both_ok, matching, both_ok);
     }
 }
 
-static void process_image_compare(
-    shmtu::cas::ocr::CasOcr& ocr,
-    const std::string& host,
-    int port,
-    const std::string& path,
-    bool json_output,
-    std::vector<CompareEntry>& entries
-) {
+void process_image_compare(shmtu::cas::ocr::CasOcr& ocr,
+                           const std::string& host,
+                           const int port,
+                           const std::string& path,
+                           const bool json_output,
+                           std::vector<CompareEntry>& entries) {
     CompareEntry entry;
     entry.file_path = path;
 
-    // Local OCR
     try {
         entry.local_result = ocr.predict(path);
         entry.local_ok = entry.local_result.success;
-    } catch (const std::exception& e) {
-        entry.local_ok = false;
-        entry.local_result.error = e.what();
+    } catch (const std::exception& exception) {
+        entry.local_result.error = exception.what();
     }
 
-    // Remote OCR
     entry.remote_result = call_remote_ocr_file(host, port, path);
     entry.remote_ok = entry.remote_result.success;
 
     if (json_output) {
-        printf("{\"file\":\"%s\","
-               "\"local\":%s,"
-               "\"remote\":%s,"
-               "\"match\":%s}\n",
-               json_escape(path).c_str(),
-               predict_result_to_json(entry.local_result).c_str(),
-               remote_result_to_json(entry.remote_result).c_str(),
-               (entry.local_ok && entry.remote_ok &&
-                entry.local_result.expression == entry.remote_result.expression &&
-                entry.local_result.result == entry.remote_result.result)
-                   ? "true" : "false");
+        const auto matched = entry.local_ok && entry.remote_ok &&
+                             entry.local_result.expression == entry.remote_result.expression &&
+                             entry.local_result.result == entry.remote_result.result;
+        std::printf("{\"file\":\"%s\",\"local\":%s,\"remote\":%s,\"match\":%s}\n",
+                    json_escape(path).c_str(),
+                    predict_result_to_json(entry.local_result).c_str(),
+                    remote_result_to_json(entry.remote_result).c_str(),
+                    matched ? "true" : "false");
     } else {
         print_compare_entry(entry);
     }
@@ -606,143 +631,96 @@ static void process_image_compare(
     entries.push_back(std::move(entry));
 }
 
-// ===========================================================================
-// Image file filter
-// ===========================================================================
-
-static bool is_image_file(const fs::path& path) {
-    auto ext = path.extension().string();
-    for (auto& c : ext) c = static_cast<char>(std::tolower(c));
-    return ext == ".png" || ext == ".jpg" || ext == ".jpeg" ||
-           ext == ".bmp" || ext == ".tif" || ext == ".tiff";
-}
-
-// ===========================================================================
-// Main
-// ===========================================================================
+}  // namespace
 
 int main(int argc, char* argv[]) {
     print_banner();
 
-    auto config = parse_args(argc, argv);
-
-    if (config.input_path.empty()) {
-        fprintf(stderr, "Error: No input path specified.\n\n");
+    const auto config = parse_args(argc, argv);
+    if (!config) {
+        std::fprintf(stderr, "Error: %s\n\n", config.error().c_str());
         print_usage(argv[0]);
         return 1;
     }
 
-    // Determine which engines we need
-    const bool need_local = !config.server_mode || config.compare_mode;
-    const bool need_remote = config.server_mode || config.compare_mode;
+    const bool need_local = !config->server_mode || config->compare_mode;
+    const bool need_remote = config->server_mode || config->compare_mode;
 
-    // Initialize local OCR engine if needed
     std::unique_ptr<shmtu::cas::ocr::CasOcr> ocr;
     if (need_local) {
-        ocr = std::make_unique<shmtu::cas::ocr::CasOcr>(config.model_dir);
-
-        printf("Loading models from: %s (precision=%s)...\n",
-               config.model_dir.c_str(), config.precision.c_str());
-
-        if (!ocr->load_model(config.precision, config.use_gpu)) {
-            fprintf(stderr, "Failed to load models.\n");
+        ocr = std::make_unique<shmtu::cas::ocr::CasOcr>(config->model_dir);
+        std::printf("Loading models from: %s (precision=%s, gpu=%s)...\n",
+                    config->model_dir.c_str(),
+                    config->precision.c_str(),
+                    config->use_gpu ? "true" : "false");
+        if (!ocr->load_model(config->precision, config->use_gpu)) {
+            std::fprintf(stderr, "Failed to load models.\n");
             return 1;
         }
-
-        printf("Model loaded (%s).\n\n",
-               ocr->model_status() == shmtu::cas::ocr::ModelStatus::LoadedGPU ? "GPU" : "CPU");
+        std::printf("Model loaded (%s).\n\n",
+                    ocr->model_status() == shmtu::cas::ocr::ModelStatus::LoadedGPU ? "GPU" : "CPU");
     }
 
-    // Verify remote server connectivity if needed
     if (need_remote) {
-        printf("Remote server: %s:%d\n", config.server_host.c_str(), config.server_port);
-
-        try {
-            httplib::Client cli(config.server_host, config.server_port);
-            cli.set_connection_timeout(5);
-            cli.set_read_timeout(5);
-            auto res = cli.Get("/api/health");
-            if (res && res->status == 200) {
-                printf("Server health: OK\n\n");
-            } else {
-                fprintf(stderr, "Warning: Server health check failed");
-                if (res) {
-                    fprintf(stderr, " (HTTP %d)", res->status);
-                } else {
-                    fprintf(stderr, " (connection error %d)", static_cast<int>(res.error()));
-                }
-                fprintf(stderr, "\nProceeding anyway...\n\n");
-            }
-        } catch (const std::exception& e) {
-            fprintf(stderr, "Warning: Cannot connect to server: %s\nProceeding anyway...\n\n", e.what());
+        std::printf("Remote server: %s:%d\n", config->server_host.c_str(), config->server_port);
+        if (const auto health = check_remote_server(*config); health) {
+            std::printf("Server health: OK\n\n");
+        } else {
+            std::fprintf(stderr, "Warning: %s\nProceeding anyway...\n\n", health.error().c_str());
         }
     }
 
-    fs::path input(config.input_path);
-
-    // Collect image file paths
-    std::vector<std::string> image_paths;
-    if (fs::is_directory(input)) {
-        for (const auto& entry : fs::directory_iterator(input)) {
-            if (entry.is_regular_file() && is_image_file(entry.path())) {
-                image_paths.push_back(entry.path().string());
-            }
-        }
-        std::sort(image_paths.begin(), image_paths.end());
-    } else if (fs::exists(input)) {
-        image_paths.push_back(config.input_path);
-    } else {
-        fprintf(stderr, "Error: Path does not exist: %s\n", config.input_path.c_str());
+    const auto image_paths = collect_image_paths(config->input_path);
+    if (!image_paths) {
+        std::fprintf(stderr, "%s.\n", image_paths.error().c_str());
         return 1;
     }
 
-    if (image_paths.empty()) {
-        fprintf(stderr, "No image files found.\n");
-        return 1;
-    }
-
-    // ---- Server mode only (no local OCR) ----
-    if (config.server_mode && !config.compare_mode) {
-        if (config.json_output) printf("[\n");
-        for (size_t i = 0; i < image_paths.size(); ++i) {
-            if (config.json_output && i > 0) printf(",\n");
-            process_image_remote(config.server_host, config.server_port,
-                                 image_paths[i], config.json_output);
+    if (config->server_mode && !config->compare_mode) {
+        if (config->json_output) {
+            std::printf("[\n");
         }
-        if (config.json_output) printf("\n]\n");
-        if (!config.json_output) printf("\nProcessed %zu image(s) via remote server.\n", image_paths.size());
+        for (size_t i = 0; i < image_paths->size(); ++i) {
+            if (config->json_output && i > 0) {
+                std::printf(",\n");
+            }
+            process_image_remote(config->server_host, config->server_port, (*image_paths)[i],
+                                 config->json_output);
+        }
+        if (config->json_output) {
+            std::printf("\n]\n");
+        } else {
+            std::printf("\nProcessed %zu image(s) via remote server.\n", image_paths->size());
+        }
         return 0;
     }
 
-    // ---- Compare mode ----
-    if (config.compare_mode) {
-        printf("Compare mode: local OCR vs remote server\n\n");
+    if (config->compare_mode) {
+        std::printf("Compare mode: local OCR vs remote server\n\n");
         print_compare_header();
-
         std::vector<CompareEntry> entries;
-        for (const auto& path : image_paths) {
-            process_image_compare(*ocr, config.server_host, config.server_port,
-                                  path, config.json_output, entries);
+        entries.reserve(image_paths->size());
+        for (const auto& path : *image_paths) {
+            process_image_compare(*ocr, config->server_host, config->server_port, path,
+                                  config->json_output, entries);
         }
-
         print_compare_summary(entries);
         return 0;
     }
 
-    // ---- Local mode (default) ----
-    if (config.json_output) {
-        printf("[\n");
+    if (config->json_output) {
+        std::printf("[\n");
     }
-
-    for (size_t i = 0; i < image_paths.size(); ++i) {
-        if (config.json_output && i > 0) printf(",\n");
-        process_image_local(*ocr, image_paths[i], config.json_output);
+    for (size_t i = 0; i < image_paths->size(); ++i) {
+        if (config->json_output && i > 0) {
+            std::printf(",\n");
+        }
+        process_image_local(*ocr, (*image_paths)[i], config->json_output);
     }
-
-    if (config.json_output) {
-        printf("\n]\n");
+    if (config->json_output) {
+        std::printf("\n]\n");
     } else {
-        printf("\nProcessed %zu image(s).\n", image_paths.size());
+        std::printf("\nProcessed %zu image(s).\n", image_paths->size());
     }
 
     return 0;

@@ -66,35 +66,43 @@ void start_tcp_server(OcrServer::Impl& impl) {
                 impl.tcp_buffers[conn].append(chunk);
             }
 
-            auto payload = take_complete_payload(impl, conn);
-            if (!payload.has_value()) {
+            if (auto payload = take_complete_payload(impl, conn); !payload.has_value()) {
                 return;
-            }
-
-            impl.total_requests.fetch_add(1);
-            std::printf(
-                "[TCP][%s] Received %zu bytes\n",
-                conn->peerAddr().toIpPort().c_str(),
-                payload->size());
-
-            std::vector<uint8_t> image_bytes(payload->begin(), payload->end());
-            bool queued_ok = false;
-            auto result = impl.predict_sync(image_bytes, queued_ok);
-            if (!queued_ok) {
-                impl.failed_requests.fetch_add(1);
-                conn->send("");
-                conn->shutdown();
-                return;
-            }
-
-            if (result.success) {
-                impl.successful_requests.fetch_add(1);
             } else {
-                impl.failed_requests.fetch_add(1);
-            }
+                impl.total_requests.fetch_add(1);
+                std::printf(
+                    "[TCP][%s] Received %zu bytes\n",
+                    conn->peerAddr().toIpPort().c_str(),
+                    payload->size());
 
-            conn->send(result.success ? result.expression : "");
-            conn->shutdown();
+                std::vector<uint8_t> image_bytes(payload->begin(), payload->end());
+                bool queued_ok = false;
+                auto result = impl.predict_sync(std::move(image_bytes), queued_ok);
+                if (!queued_ok) {
+                    impl.failed_requests.fetch_add(1);
+                    std::printf("[TCP][%s] Queue is full, request rejected\n",
+                                conn->peerAddr().toIpPort().c_str());
+                    conn->send("");
+                    conn->shutdown();
+                    return;
+                }
+
+                if (result.success) {
+                    impl.successful_requests.fetch_add(1);
+                    std::printf("[TCP][%s] Prediction succeeded: %s => %d\n",
+                                conn->peerAddr().toIpPort().c_str(),
+                                result.expression.c_str(),
+                                result.result);
+                } else {
+                    impl.failed_requests.fetch_add(1);
+                    std::printf("[TCP][%s] Prediction failed: %s\n",
+                                conn->peerAddr().toIpPort().c_str(),
+                                result.error.c_str());
+                }
+
+                conn->send(result.success ? result.expression : "");
+                conn->shutdown();
+            }
         });
 
     impl.tcp_server->start();

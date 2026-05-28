@@ -15,12 +15,14 @@
 #include <optional>
 #include <queue>
 #include <semaphore>
+#include <span>
 #include <stop_token>
 #include <string>
 #include <string_view>
 #include <thread>
 #include <unordered_map>
 #include <vector>
+#include <expected>
 
 #include <drogon/HttpResponse.h>
 #include <trantor/net/EventLoopThread.h>
@@ -29,7 +31,7 @@
 
 namespace shmtu::cas::ocr {
 
-std::vector<uint8_t> base64_decode(std::string_view input);
+std::expected<std::vector<uint8_t>, std::string> base64_decode(std::string_view input);
 
 drogon::HttpResponsePtr make_json_response(
     const Json::Value& body,
@@ -56,7 +58,8 @@ struct OcrWorkerPool {
 struct OcrServer::Impl {
     explicit Impl(const ServerConfig& cfg);
 
-    PredictResult predict_sync(const std::vector<uint8_t>& image_bytes, bool& queued_ok);
+    PredictResult predict_sync(std::span<const uint8_t> image_bytes, bool& queued_ok);
+    PredictResult predict_sync(std::vector<uint8_t> image_bytes, bool& queued_ok);
 
     ServerConfig config;
     std::unique_ptr<OcrWorkerPool> pool;

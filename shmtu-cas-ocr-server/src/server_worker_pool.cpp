@@ -1,5 +1,6 @@
 #include "server_internal.h"
 
+#include <ranges>
 #include <utility>
 
 namespace shmtu::cas::ocr {
@@ -11,7 +12,7 @@ static const char kBase64Table[] =
 
 } // namespace
 
-std::vector<uint8_t> base64_decode(std::string_view input) {
+std::expected<std::vector<uint8_t>, std::string> base64_decode(std::string_view input) {
     static std::array<int, 256> decode_table = [] {
         std::array<int, 256> table{};
         table.fill(-1);
@@ -26,19 +27,30 @@ std::vector<uint8_t> base64_decode(std::string_view input) {
 
     int value = 0;
     int bits = -8;
-    for (unsigned char c : input) {
+    bool saw_payload = false;
+    for (const auto c : input | std::views::transform([](const char ch) {
+             return static_cast<unsigned char>(ch);
+         })) {
         if (decode_table[c] == -1) {
             if (c == '=') {
                 break;
             }
+            if (!std::isspace(c)) {
+                return std::unexpected("Invalid base64 character");
+            }
             continue;
         }
+        saw_payload = true;
         value = (value << 6) | decode_table[c];
         bits += 6;
         if (bits >= 0) {
             result.push_back(static_cast<uint8_t>((value >> bits) & 0xFF));
             bits -= 8;
         }
+    }
+
+    if (!saw_payload && !input.empty()) {
+        return std::unexpected("Empty base64 payload");
     }
 
     return result;
@@ -49,7 +61,7 @@ void OcrWorkerPool::add_worker(std::unique_ptr<CasOcr> ocr) {
 }
 
 void OcrWorkerPool::start() {
-    for (size_t i = 0; i < workers.size(); ++i) {
+    for (const auto i : std::views::iota(size_t{0}, workers.size())) {
         threads.emplace_back([this, idx = i](std::stop_token stop_token) {
             while (!stop_token.stop_requested()) {
                 if (!semaphore.try_acquire_for(std::chrono::milliseconds(100))) {
@@ -107,15 +119,21 @@ OcrServer::Impl::Impl(const ServerConfig& cfg)
 }
 
 PredictResult OcrServer::Impl::predict_sync(
-    const std::vector<uint8_t>& image_bytes,
+    std::span<const uint8_t> image_bytes,
+    bool& queued_ok) {
+    return predict_sync(std::vector<uint8_t>(image_bytes.begin(), image_bytes.end()), queued_ok);
+}
+
+PredictResult OcrServer::Impl::predict_sync(
+    std::vector<uint8_t> image_bytes,
     bool& queued_ok) {
     PredictResult result;
     std::mutex result_mutex;
     std::condition_variable result_cv;
     bool done = false;
 
-    queued_ok = pool->submit([&](CasOcr& ocr) {
-        result = ocr.predict(image_bytes);
+    queued_ok = pool->submit([&, image_bytes = std::move(image_bytes)](CasOcr& ocr) {
+        result = ocr.predict(std::span<const uint8_t>(image_bytes));
         {
             std::lock_guard<std::mutex> lock(result_mutex);
             done = true;
