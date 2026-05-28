@@ -72,6 +72,50 @@ std::string boolToString(const bool value) {
     return value ? "true" : "false";
 }
 
+struct GpuAvailabilityState {
+    bool built_with_vulkan = false;
+    bool runtime_available = false;
+};
+
+GpuAvailabilityState detectGpuAvailability() {
+    GpuAvailabilityState state;
+#ifdef NCNN_SUPPORT_VULKAN
+    state.built_with_vulkan = true;
+    state.runtime_available = shmtu::cas::ocr::CasOcr::is_vulkan_supported();
+#endif
+    return state;
+}
+
+QString gpuCheckboxText(const GpuAvailabilityState& state) {
+    if (state.built_with_vulkan && state.runtime_available) {
+        return qs("GPU加速（Vulkan可用）");
+    }
+    return qs("GPU加速（Vulkan不可用）");
+}
+
+QString gpuTooltipText(const GpuAvailabilityState& state) {
+    if (!state.built_with_vulkan) {
+        return qs("当前 GUI 不是 Vulkan 构建，请使用 Vulkan 启动脚本。");
+    }
+    if (!state.runtime_available) {
+        return qs("当前构建已启用 Vulkan，但未检测到可用 Vulkan 设备。");
+    }
+    return qs("已检测到可用 Vulkan 设备，可以启用 GPU 加速。");
+}
+
+QString gpuStatusText(const GpuAvailabilityState& state, const bool use_gpu) {
+    if (!state.built_with_vulkan) {
+        return qs("Vulkan不可用，GPU加速已禁用，请使用 Vulkan 启动脚本。");
+    }
+    if (!state.runtime_available) {
+        return qs("Vulkan不可用，GPU加速已禁用，未检测到可用设备。");
+    }
+    if (use_gpu) {
+        return qs("Vulkan可用，GPU加速已启用。");
+    }
+    return qs("Vulkan可用，可手动启用 GPU 加速。");
+}
+
 QString buildWindowStyleSheet() {
     return QString::fromLatin1(R"(
 QMainWindow {
@@ -314,6 +358,7 @@ MainWindow::MainWindow(const LaunchOptions& launch_options)
     buildMenuBar();
     buildUi();
     updateModelStatusUi();
+    setStatusText(gpuStatusText(detectGpuAvailability(), use_gpu_checkbox_->isChecked()));
     updateResultTextLayout();
     {
         std::ostringstream oss;
@@ -428,6 +473,12 @@ void MainWindow::buildTopBar(QVBoxLayout* root_layout) {
 
     connect(check_download_button_, &QPushButton::clicked, this,
             [this]() { onCheckDownloadModels(); });
+    connect(use_gpu_checkbox_, &QCheckBox::toggled, this, [this](bool checked) {
+        logMessage("use_gpu_checkbox toggled: " + boolToString(checked));
+        if (!model_loaded_) {
+            setStatusText(gpuStatusText(detectGpuAvailability(), checked));
+        }
+    });
 }
 
 void MainWindow::buildMainArea(QVBoxLayout* root_layout) {
@@ -866,13 +917,38 @@ void MainWindow::onReleaseModel() {
     setStatusText(qs("模型已释放"));
 }
 
+void MainWindow::updateGpuAvailabilityUi() {
+    if (!use_gpu_checkbox_) {
+        return;
+    }
+
+    const GpuAvailabilityState state = detectGpuAvailability();
+    const bool can_use_gpu = state.built_with_vulkan && state.runtime_available;
+
+    use_gpu_checkbox_->setText(gpuCheckboxText(state));
+    use_gpu_checkbox_->setToolTip(gpuTooltipText(state));
+    if (!can_use_gpu) {
+        use_gpu_checkbox_->setChecked(false);
+        launch_options_.use_gpu = false;
+    }
+    use_gpu_checkbox_->setEnabled(!model_loaded_ && can_use_gpu);
+
+    std::ostringstream oss;
+    oss << "updateGpuAvailabilityUi: applied"
+        << ", built_with_vulkan=" << boolToString(state.built_with_vulkan)
+        << ", runtime_available=" << boolToString(state.runtime_available)
+        << ", checked=" << boolToString(use_gpu_checkbox_->isChecked())
+        << ", enabled=" << boolToString(use_gpu_checkbox_->isEnabled());
+    logMessage(oss.str());
+}
+
 void MainWindow::updateModelStatusUi() {
     model_status_label_->setText(model_loaded_ ? qs("模型已就绪") : qs("模型未就绪"));
     model_status_label_->setStyleSheet(QStringLiteral(
         "QLabel#statusBadge { background: %1; color: white; border-radius: 12px; padding: 4px 10px; font-size: 12px; font-weight: 600; }")
         .arg(model_loaded_ ? COLOR_SUCCESS : COLOR_BADGE_IDLE));
     precision_combo_->setEnabled(!model_loaded_);
-    use_gpu_checkbox_->setEnabled(!model_loaded_);
+    updateGpuAvailabilityUi();
     recognize_button_->setEnabled(model_loaded_);
     add_to_batch_button_->setEnabled(model_loaded_);
     batch_recognize_button_->setEnabled(model_loaded_);

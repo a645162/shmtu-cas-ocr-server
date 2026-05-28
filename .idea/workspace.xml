@@ -26,10 +26,10 @@
     <configurations>
       <configuration PROFILE_NAME="Debug" ENABLED="true" CONFIG_NAME="Debug" GENERATION_OPTIONS="-DCMAKE_TOOLCHAIN_FILE=/home/konghaomin/.vcpkg-clion/vcpkg/scripts/buildsystems/vcpkg.cmake" />
       <configuration PROFILE_NAME="Release" ENABLED="true" CONFIG_NAME="Release" GENERATION_OPTIONS="-DCMAKE_TOOLCHAIN_FILE=/home/konghaomin/.vcpkg-clion/vcpkg/scripts/buildsystems/vcpkg.cmake -DCMAKE_CXX_COMPILER=&quot;/usr/bin/g++&quot;" />
+      <configuration PROFILE_NAME="linux-vcpkg-vulkan-gui" ENABLED="true" FROM_PRESET="true" GENERATION_DIR="$PROJECT_DIR$/build/linux-vcpkg-vulkan-gui" />
       <configuration PROFILE_NAME="linux-vcpkg" ENABLED="false" FROM_PRESET="true" GENERATION_DIR="$PROJECT_DIR$/build/linux-vcpkg" />
       <configuration PROFILE_NAME="linux-vcpkg-gui" ENABLED="false" FROM_PRESET="true" GENERATION_DIR="$PROJECT_DIR$/build/linux-vcpkg-gui" />
       <configuration PROFILE_NAME="linux-vcpkg-vulkan" ENABLED="false" FROM_PRESET="true" GENERATION_DIR="$PROJECT_DIR$/build/linux-vcpkg-vulkan" />
-      <configuration PROFILE_NAME="linux-vcpkg-vulkan-gui" ENABLED="false" FROM_PRESET="true" GENERATION_DIR="$PROJECT_DIR$/build/linux-vcpkg-vulkan-gui" />
       <configuration PROFILE_NAME="linux-vcpkg - build-linux-vcpkg" ENABLED="false" FROM_PRESET="true" GENERATION_DIR="$PROJECT_DIR$/build/linux-vcpkg" />
       <configuration PROFILE_NAME="linux-vcpkg-gui - build-linux-vcpkg-gui" ENABLED="false" FROM_PRESET="true" GENERATION_DIR="$PROJECT_DIR$/build/linux-vcpkg-gui" />
       <configuration PROFILE_NAME="linux-vcpkg-vulkan - build-linux-vcpkg-vulkan" ENABLED="false" FROM_PRESET="true" GENERATION_DIR="$PROJECT_DIR$/build/linux-vcpkg-vulkan" />
@@ -38,41 +38,7 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="a82aa7ad-7fdc-4191-85b9-3f860c873848" name="更改" comment="">
-      <change beforePath="$PROJECT_DIR$/.idea/editor.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/editor.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/shmtu-cas-ocr-server.iml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/shmtu-cas-ocr-server.iml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/CMakeLists.txt" beforeDir="false" afterPath="$PROJECT_DIR$/CMakeLists.txt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/ocr_compare_test.sh" beforeDir="false" afterPath="$PROJECT_DIR$/ocr_compare_test.sh" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/scripts/_common.py" beforeDir="false" afterPath="$PROJECT_DIR$/scripts/_common.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/scripts/run_cli.py" beforeDir="false" afterPath="$PROJECT_DIR$/scripts/run_cli.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/scripts/run_gui.py" beforeDir="false" afterPath="$PROJECT_DIR$/scripts/run_gui.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/scripts/run_server.py" beforeDir="false" afterPath="$PROJECT_DIR$/scripts/run_server.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/shmtu-cas-ocr-cli/CMakeLists.txt" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/shmtu-cas-ocr-cli/src/main.cpp" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/shmtu-cas-ocr-gui/CMakeLists.txt" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/shmtu-cas-ocr-gui/include/shmtu/cas_ocr/gui/image_view.h" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/shmtu-cas-ocr-gui/include/shmtu/cas_ocr/gui/launch_options.h" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/shmtu-cas-ocr-gui/include/shmtu/cas_ocr/gui/logging.h" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/shmtu-cas-ocr-gui/include/shmtu/cas_ocr/gui/main_window.h" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/shmtu-cas-ocr-gui/include/shmtu/cas_ocr/gui/model_download.h" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/shmtu-cas-ocr-gui/src/image_view.cpp" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/shmtu-cas-ocr-gui/src/logging.cpp" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/shmtu-cas-ocr-gui/src/main.cpp" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/shmtu-cas-ocr-gui/src/main_window.cpp" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/shmtu-cas-ocr-gui/src/model_download.cpp" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/shmtu-cas-ocr-lib/CMakeLists.txt" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/shmtu-cas-ocr-lib/include/shmtu/cas_ocr/cas_ocr.h" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/shmtu-cas-ocr-lib/include/shmtu/cas_ocr/types.h" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/shmtu-cas-ocr-lib/src/cas_ocr.cpp" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/shmtu-cas-ocr-server/CMakeLists.txt" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/shmtu-cas-ocr-server/include/shmtu/cas_ocr/server.h" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/shmtu-cas-ocr-server/src/main.cpp" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/shmtu-cas-ocr-server/src/server.cpp" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/shmtu-cas-ocr-server/src/server_http.cpp" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/shmtu-cas-ocr-server/src/server_internal.h" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/shmtu-cas-ocr-server/src/server_tcp.cpp" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/shmtu-cas-ocr-server/src/server_worker_pool.cpp" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/vcpkg.json" beforeDir="false" afterPath="$PROJECT_DIR$/vcpkg.json" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -162,18 +128,6 @@
   }
 }</component>
   <component name="RunManager" selected="CMake 应用程序.shmtu_cas_ocr_cli">
-    <configuration default="true" type="CMakeBoostTestRunConfigurationType" factoryName="Boost Test" REDIRECT_INPUT="false" ELEVATE="false" USE_EXTERNAL_CONSOLE="false" EMULATE_TERMINAL="false" PASS_PARENT_ENVS_2="true">
-      <method v="2" />
-    </configuration>
-    <configuration default="true" type="CMakeCatchTestRunConfigurationType" factoryName="Catch Test" REDIRECT_INPUT="false" ELEVATE="false" USE_EXTERNAL_CONSOLE="false" EMULATE_TERMINAL="false" PASS_PARENT_ENVS_2="true">
-      <method v="2" />
-    </configuration>
-    <configuration default="true" type="CMakeDoctestTestRunConfigurationType" factoryName="doctest Test" REDIRECT_INPUT="false" ELEVATE="false" USE_EXTERNAL_CONSOLE="false" EMULATE_TERMINAL="false" PASS_PARENT_ENVS_2="true">
-      <method v="2" />
-    </configuration>
-    <configuration default="true" type="CMakeGoogleTestRunConfigurationType" factoryName="Google Test" REDIRECT_INPUT="false" ELEVATE="false" USE_EXTERNAL_CONSOLE="false" EMULATE_TERMINAL="false" PASS_PARENT_ENVS_2="true">
-      <method v="2" />
-    </configuration>
     <configuration default="true" type="CMakeBoostTestRunConfigurationType" factoryName="Boost Test" REDIRECT_INPUT="false" ELEVATE="false" USE_EXTERNAL_CONSOLE="false" EMULATE_TERMINAL="false" PASS_PARENT_ENVS_2="true" TEST_MODE="SUITE_TEST">
       <method v="2">
         <option name="BeforeTestRunTask" enabled="true" />
@@ -194,9 +148,29 @@
         <option name="BeforeTestRunTask" enabled="true" />
       </method>
     </configuration>
-    <configuration default="true" type="CMakeRunConfiguration" factoryName="Application" REDIRECT_INPUT="false" ELEVATE="false" USE_EXTERNAL_CONSOLE="false" EMULATE_TERMINAL="false" PASS_PARENT_ENVS_2="true">
+    <configuration default="true" type="CLionExternalRunConfiguration" factoryName="Application" REDIRECT_INPUT="false" ELEVATE="false" USE_EXTERNAL_CONSOLE="false" EMULATE_TERMINAL="false" PASS_PARENT_ENVS_2="true">
       <method v="2">
-        <option name="com.jetbrains.cidr.execution.CidrBuildBeforeRunTaskProvider$BuildBeforeRunTask" enabled="true" />
+        <option name="CLION.EXTERNAL.BUILD" enabled="true" />
+      </method>
+    </configuration>
+    <configuration default="true" type="CMakeBoostTestRunConfigurationType" factoryName="Boost Test" REDIRECT_INPUT="false" ELEVATE="false" USE_EXTERNAL_CONSOLE="false" EMULATE_TERMINAL="false" PASS_PARENT_ENVS_2="true" TEST_MODE="SUITE_TEST">
+      <method v="2">
+        <option name="BeforeTestRunTask" enabled="true" />
+      </method>
+    </configuration>
+    <configuration default="true" type="CMakeCatchTestRunConfigurationType" factoryName="Catch Test" REDIRECT_INPUT="false" ELEVATE="false" USE_EXTERNAL_CONSOLE="false" EMULATE_TERMINAL="false" PASS_PARENT_ENVS_2="true" TEST_MODE="SUITE_TEST">
+      <method v="2">
+        <option name="BeforeTestRunTask" enabled="true" />
+      </method>
+    </configuration>
+    <configuration default="true" type="CMakeDoctestTestRunConfigurationType" factoryName="doctest Test" REDIRECT_INPUT="false" ELEVATE="false" USE_EXTERNAL_CONSOLE="false" EMULATE_TERMINAL="false" PASS_PARENT_ENVS_2="true" TEST_MODE="SUITE_TEST">
+      <method v="2">
+        <option name="BeforeTestRunTask" enabled="true" />
+      </method>
+    </configuration>
+    <configuration default="true" type="CMakeGoogleTestRunConfigurationType" factoryName="Google Test" REDIRECT_INPUT="false" ELEVATE="false" USE_EXTERNAL_CONSOLE="false" EMULATE_TERMINAL="false" PASS_PARENT_ENVS_2="true" TEST_MODE="SUITE_TEST">
+      <method v="2">
+        <option name="BeforeTestRunTask" enabled="true" />
       </method>
     </configuration>
     <configuration name="shmtu_cas_ocr_cli" type="CMakeRunConfiguration" factoryName="Application" folderName="ocr" REDIRECT_INPUT="false" ELEVATE="false" USE_EXTERNAL_CONSOLE="false" EMULATE_TERMINAL="false" PASS_PARENT_ENVS_2="true" PROJECT_NAME="shmtu-cas-cpp" TARGET_NAME="shmtu_cas_ocr_cli" CONFIG_NAME="Debug" RUN_TARGET_PROJECT_NAME="shmtu-cas-cpp" RUN_TARGET_NAME="shmtu_cas_ocr_cli">
@@ -235,6 +209,7 @@
       <workItem from="1779875083769" duration="1573000" />
       <workItem from="1779954897378" duration="84000" />
       <workItem from="1779964667166" duration="3848000" />
+      <workItem from="1779975079269" duration="1011000" />
     </task>
     <servers />
   </component>

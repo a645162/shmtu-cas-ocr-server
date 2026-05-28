@@ -65,6 +65,7 @@ private:
     void startModelDownload(const std::vector<std::string>& missing_files, bool use_gitee);
     void loadModelFromCurrentSettings();
     void onReleaseModel();
+    void updateGpuAvailabilityUi();
     void updateModelStatusUi();
 
     void onDownloadCaptcha();
