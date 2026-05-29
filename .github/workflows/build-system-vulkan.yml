@@ -112,13 +112,10 @@ jobs:
       - name: Checkout source
         uses: actions/checkout@v4
 
-      - name: Install host tools
+      - name: Verify host tools
         run: |
-          sudo apt-get update
-          sudo apt-get install -y \
-            docker.io \
-            python3 \
-            ca-certificates
+          docker --version
+          python3 --version
 
       - name: Export program version
         run: |
