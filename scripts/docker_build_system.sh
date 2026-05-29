@@ -73,7 +73,7 @@ docker run --rm \
   "
 
 echo "[4/5] Building runtime image from copied artifacts..."
-docker build -f "${RUNTIME_DOCKERFILE}" -t "${RUNTIME_IMAGE}" .
+docker build -f "${RUNTIME_DOCKERFILE}" --target runtime -t "${RUNTIME_IMAGE}" .
 
 echo "[5/5] Done."
 echo "Binaries:"
