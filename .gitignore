@@ -10,6 +10,7 @@ vcpkg_installed/
 build/
 build*/
 tmp/
+.env.local
 
 # Models
 *.bin

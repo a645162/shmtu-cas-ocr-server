@@ -99,15 +99,15 @@ jobs:
       matrix:
         include:
           - variant: cpu
-            local_image: shmtu-cas-ocr-server:system-cpu
-            artifact_name: ubuntu-2404-system-cpu-artifacts
+            local_image: shmtu-cas-ocr-server:cpu
+            artifact_name: ubuntu-2404-cpu-artifacts
             build_dir: build/linux-system
-            archive_name: shmtu-cas-ocr-server-system-cpu.tar
+            archive_name: shmtu-cas-ocr-server-cpu.tar
           - variant: vulkan
-            local_image: shmtu-cas-ocr-server:system-vulkan
-            artifact_name: ubuntu-2404-system-vulkan-artifacts
+            local_image: shmtu-cas-ocr-server:vulkan
+            artifact_name: ubuntu-2404-vulkan-artifacts
             build_dir: build/linux-system-vulkan
-            archive_name: shmtu-cas-ocr-server-system-vulkan.tar
+            archive_name: shmtu-cas-ocr-server-vulkan.tar
     steps:
       - name: Checkout source
         uses: actions/checkout@v4
@@ -152,19 +152,19 @@ jobs:
       matrix:
         include:
           - variant: cpu
-            local_image: shmtu-cas-ocr-server:system-cpu
-            artifact_name: ubuntu-2404-system-cpu-artifacts
-            archive_name: shmtu-cas-ocr-server-system-cpu.tar
+            local_image: shmtu-cas-ocr-server:cpu
+            artifact_name: ubuntu-2404-cpu-artifacts
+            archive_name: shmtu-cas-ocr-server-cpu.tar
             tag_suffix: cpu
-            publish_bare: "false"
-            publish_vulkan_alias: "false"
-          - variant: vulkan
-            local_image: shmtu-cas-ocr-server:system-vulkan
-            artifact_name: ubuntu-2404-system-vulkan-artifacts
-            archive_name: shmtu-cas-ocr-server-system-vulkan.tar
-            tag_suffix: vulkan
             publish_bare: "true"
-            publish_vulkan_alias: "true"
+            publish_variant_alias: "true"
+          - variant: vulkan
+            local_image: shmtu-cas-ocr-server:vulkan
+            artifact_name: ubuntu-2404-vulkan-artifacts
+            archive_name: shmtu-cas-ocr-server-vulkan.tar
+            tag_suffix: vulkan
+            publish_bare: "false"
+            publish_variant_alias: "true"
     steps:
       - name: Export release versions
         run: |
@@ -201,14 +201,7 @@ jobs:
               "latest"
             )
           fi
-          if [ "${{ matrix.publish_vulkan_alias }}" = "true" ]; then
-            TAGS+=(
-              "${SERVER_VERSION}-${{ matrix.tag_suffix }}"
-              "${VERSION_MINOR}-${{ matrix.tag_suffix }}"
-              "${VERSION_MAJOR}-${{ matrix.tag_suffix }}"
-              "latest-${{ matrix.tag_suffix }}"
-            )
-          else
+          if [ "${{ matrix.publish_variant_alias }}" = "true" ]; then
             TAGS+=(
               "${SERVER_VERSION}-${{ matrix.tag_suffix }}"
               "${VERSION_MINOR}-${{ matrix.tag_suffix }}"
@@ -232,12 +225,12 @@ jobs:
         include:
           - variant: cpu
             tag_suffix: cpu
-            publish_bare: "false"
-            publish_vulkan_alias: "false"
+            publish_bare: "true"
+            publish_variant_alias: "true"
           - variant: vulkan
             tag_suffix: vulkan
-            publish_bare: "true"
-            publish_vulkan_alias: "true"
+            publish_bare: "false"
+            publish_variant_alias: "true"
     steps:
       - name: Export release versions
         run: |
@@ -277,14 +270,7 @@ jobs:
               --tag "${{ env.DOCKER_HUB_REPO }}:latest"
             )
           fi
-          if [ "${{ matrix.publish_vulkan_alias }}" = "true" ]; then
-            TAG_ARGS+=(
-              --tag "${{ env.DOCKER_HUB_REPO }}:${{ env.SERVER_VERSION }}-${{ matrix.tag_suffix }}"
-              --tag "${{ env.DOCKER_HUB_REPO }}:${{ env.VERSION_MINOR }}-${{ matrix.tag_suffix }}"
-              --tag "${{ env.DOCKER_HUB_REPO }}:${{ env.VERSION_MAJOR }}-${{ matrix.tag_suffix }}"
-              --tag "${{ env.DOCKER_HUB_REPO }}:latest-${{ matrix.tag_suffix }}"
-            )
-          else
+          if [ "${{ matrix.publish_variant_alias }}" = "true" ]; then
             TAG_ARGS+=(
               --tag "${{ env.DOCKER_HUB_REPO }}:${{ env.SERVER_VERSION }}-${{ matrix.tag_suffix }}"
               --tag "${{ env.DOCKER_HUB_REPO }}:${{ env.VERSION_MINOR }}-${{ matrix.tag_suffix }}"
@@ -305,12 +291,12 @@ jobs:
         include:
           - variant: cpu
             tag_suffix: cpu
-            publish_bare: "false"
-            publish_vulkan_alias: "false"
+            publish_bare: "true"
+            publish_variant_alias: "true"
           - variant: vulkan
             tag_suffix: vulkan
-            publish_bare: "true"
-            publish_vulkan_alias: "true"
+            publish_bare: "false"
+            publish_variant_alias: "true"
     steps:
       - name: Export release versions
         run: |
@@ -352,14 +338,7 @@ jobs:
               --tag "${{ env.ACR_REGISTRY }}/${{ env.DOCKER_HUB_REPO }}:latest"
             )
           fi
-          if [ "${{ matrix.publish_vulkan_alias }}" = "true" ]; then
-            TAG_ARGS+=(
-              --tag "${{ env.ACR_REGISTRY }}/${{ env.DOCKER_HUB_REPO }}:${{ env.SERVER_VERSION }}-${{ matrix.tag_suffix }}"
-              --tag "${{ env.ACR_REGISTRY }}/${{ env.DOCKER_HUB_REPO }}:${{ env.VERSION_MINOR }}-${{ matrix.tag_suffix }}"
-              --tag "${{ env.ACR_REGISTRY }}/${{ env.DOCKER_HUB_REPO }}:${{ env.VERSION_MAJOR }}-${{ matrix.tag_suffix }}"
-              --tag "${{ env.ACR_REGISTRY }}/${{ env.DOCKER_HUB_REPO }}:latest-${{ matrix.tag_suffix }}"
-            )
-          else
+          if [ "${{ matrix.publish_variant_alias }}" = "true" ]; then
             TAG_ARGS+=(
               --tag "${{ env.ACR_REGISTRY }}/${{ env.DOCKER_HUB_REPO }}:${{ env.SERVER_VERSION }}-${{ matrix.tag_suffix }}"
               --tag "${{ env.ACR_REGISTRY }}/${{ env.DOCKER_HUB_REPO }}:${{ env.VERSION_MINOR }}-${{ matrix.tag_suffix }}"

@@ -115,15 +115,21 @@ cmake --build --preset build-linux-system-vulkan-gui
 * 如果显式设置了 `SHMTU_NCNN_ROOT` 或 `NCNN_ROOT`，请不要再使用 `linux-vcpkg*` preset；顶层 CMake 会直接报错并要求改用 `linux-system*`
 * Docker 化 system 构建的默认 builder 镜像名为 `shmtu-cas-ocr-builder:system-vulkan`，runtime 本地镜像名为 `shmtu-cas-ocr-server:vulkan`
 * CI 发布的远端镜像 tag 采用：
-  * GPU/Vulkan 主标签：`<version>`、`<major>.<minor>`、`<major>`、`latest`
-  * GPU/Vulkan 兼容别名：`<version>-vulkan`、`latest-vulkan`
-  * CPU 标签：`<version>-cpu`、`latest-cpu`
-* 当前仓库内的 `docker-compose.yml` 默认直接消费 `a645162/shmtu-cas-ocr-server:latest`
+  * CPU 主标签：`<version>`、`<major>.<minor>`、`<major>`、`latest`
+  * CPU 兼容别名：`<version>-cpu`、`latest-cpu`
+  * GPU/Vulkan 标签：`<version>-vulkan`、`<major>.<minor>-vulkan`、`<major>-vulkan`、`latest-vulkan`
+* 当前仓库内的 `docker-compose.yml` 默认直接消费 `a645162/shmtu-cas-ocr-server:latest-vulkan`
 
 runtime 镜像构建完成后可以直接启动：
 
 ```bash
 docker compose up -d
+```
+
+当前仓库已提供可提交的默认配置文件 `.env`。如果你想写自己机器上的覆盖配置，建议新建 `.env.local`，并显式指定：
+
+```bash
+docker compose --env-file .env.local up -d
 ```
 
 并发参数通过环境变量控制，默认都支持 `0 = 自动调节`：
@@ -139,7 +145,7 @@ docker compose up -d
 例如固定到某个服务版本：
 
 ```bash
-SHMTU_RUNTIME_IMAGE=a645162/shmtu-cas-ocr-server:2.0.0 docker compose up -d
+SHMTU_RUNTIME_IMAGE=a645162/shmtu-cas-ocr-server:2.0.0-vulkan docker compose up -d
 ```
 
 版本设计上，当前仓库采用单一版本源 `VERSION`，并默认让 `lib/server/cli/gui` 跟随同一发布版本线。当前 `2.x` 表示服务端已经进入 HTTP + TCP 双协议阶段，和只提供 TCP 的 `1.x` 区分开。

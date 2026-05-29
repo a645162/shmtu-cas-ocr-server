@@ -2,7 +2,7 @@ version: "3.8"
 
 services:
   shmtu-cas-ocr-server:
-    image: ${SHMTU_RUNTIME_IMAGE:-a645162/shmtu-cas-ocr-server:latest}
+    image: ${SHMTU_RUNTIME_IMAGE:-a645162/shmtu-cas-ocr-server:latest-vulkan}
     container_name: shmtu-cas-ocr-server
     restart: unless-stopped
     ports:
