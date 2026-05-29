@@ -16,6 +16,17 @@ python3 ./scripts/download_models.py --force
 python3 ./scripts/download_models.py --dest /tmp/shmtu-models
 ```
 
+### `ci_build_system_vulkan.sh` / `setup_local_system_vulkan.sh`
+
+这两个脚本共用同一套 Docker builder 构建链路：
+
+- `./scripts/ci_build_system_vulkan.sh`
+  - 面向 CI 和通用场景。
+  - 不启用 `chsrc`，builder 镜像内保持默认 Ubuntu `apt` 源。
+- `./scripts/setup_local_system_vulkan.sh`
+  - 面向本地 Ubuntu 机器。
+  - 会显式传入 `USE_CHSRC=1`，在 builder 镜像内执行 `chsrc set ubuntu`。
+
 ### `run_server.py`
 
 启动 `shmtu_cas_ocr_server`。

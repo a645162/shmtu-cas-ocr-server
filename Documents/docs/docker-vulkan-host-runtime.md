@@ -39,11 +39,15 @@ CI 和本地共用：
 ./scripts/ci_build_system_vulkan.sh
 ```
 
+这条路径默认不启用 `chsrc`，GitHub Actions 也使用它。
+
 本地如果需要 `chsrc` 换源，使用：
 
 ```bash
 ./scripts/setup_local_system_vulkan.sh
 ```
+
+这个本地 wrapper 会显式传入 `USE_CHSRC=1`，在 builder 镜像内执行 `chsrc set ubuntu`。
 
 执行完成后，产物会同时存在于：
 

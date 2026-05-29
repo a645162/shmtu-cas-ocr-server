@@ -9,7 +9,9 @@ ENV SHMTU_WORKERS=0
 ENV SHMTU_QUEUE_CAPACITY=0
 ENV SHMTU_NCNN_THREADS=0
 
-RUN apt-get update && apt-get install -y --no-install-recommends \
+RUN apt-get update \
+    && apt-get upgrade -y \
+    && apt-get install -y --no-install-recommends \
         libdrogon1t64 \
         libtrantor1 \
         libopencv-core406t64 \

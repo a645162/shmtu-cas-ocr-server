@@ -61,11 +61,15 @@ If you want local and CI to share the same build pipeline, prefer the Docker bui
 ./scripts/ci_build_system_vulkan.sh
 ```
 
+This path does not enable `chsrc`, and GitHub Actions uses the same default behavior.
+
 For local Ubuntu machines that need a faster apt mirror inside the builder image:
 
 ```bash
 ./scripts/setup_local_system_vulkan.sh
 ```
+
+That local wrapper explicitly sets `USE_CHSRC=1`, so `chsrc set ubuntu` runs inside the builder image.
 
 Notes:
 

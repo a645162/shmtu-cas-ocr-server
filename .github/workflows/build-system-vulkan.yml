@@ -19,6 +19,7 @@ on:
       - "scripts/docker_build_system.sh"
       - "scripts/docker_build_system_vulkan.sh"
       - "scripts/ci_build_system_vulkan.sh"
+      - "scripts/verify_runtime_images.sh"
       - "3rdparty/NCNN/**"
       - "ocr/**"
   pull_request:
@@ -35,6 +36,7 @@ on:
       - "scripts/docker_build_system.sh"
       - "scripts/docker_build_system_vulkan.sh"
       - "scripts/ci_build_system_vulkan.sh"
+      - "scripts/verify_runtime_images.sh"
       - "3rdparty/NCNN/**"
       - "ocr/**"
 
@@ -136,6 +138,11 @@ jobs:
         run: |
           chmod +x scripts/docker_build_system.sh
           ./scripts/docker_build_system.sh "${{ matrix.variant }}"
+
+      - name: Verify bundled and non-bundled images
+        run: |
+          chmod +x scripts/verify_runtime_images.sh
+          ./scripts/verify_runtime_images.sh "${{ matrix.variant }}"
 
       - name: Export runtime images
         run: |

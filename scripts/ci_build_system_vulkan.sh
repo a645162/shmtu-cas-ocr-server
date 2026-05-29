@@ -7,4 +7,4 @@ PROJECT_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 
 cd "${PROJECT_ROOT}"
 
-USE_CHSRC="${USE_CHSRC:-0}" ./scripts/docker_build_system_vulkan.sh
+./scripts/docker_build_system_vulkan.sh

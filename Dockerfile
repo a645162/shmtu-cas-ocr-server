@@ -12,7 +12,9 @@ FROM ubuntu:24.04 AS builder-base
 ENV DEBIAN_FRONTEND=noninteractive
 ENV VCPKG_ROOT=/opt/vcpkg
 
-RUN apt-get update && apt-get install -y --no-install-recommends \
+RUN apt-get update \
+    && apt-get upgrade -y \
+    && apt-get install -y --no-install-recommends \
         build-essential \
         cmake \
         curl \
@@ -46,7 +48,9 @@ FROM ubuntu:24.04 AS runtime-cpu
 ENV DEBIAN_FRONTEND=noninteractive
 ENV LD_LIBRARY_PATH=/opt/shmtu/lib
 
-RUN apt-get update && apt-get install -y --no-install-recommends \
+RUN apt-get update \
+    && apt-get upgrade -y \
+    && apt-get install -y --no-install-recommends \
         libgomp1 \
         libstdc++6 \
         curl \
@@ -70,7 +74,9 @@ FROM ubuntu:24.04 AS runtime-gpu
 ENV DEBIAN_FRONTEND=noninteractive
 ENV LD_LIBRARY_PATH=/opt/shmtu/lib
 
-RUN apt-get update && apt-get install -y --no-install-recommends \
+RUN apt-get update \
+    && apt-get upgrade -y \
+    && apt-get install -y --no-install-recommends \
         libgomp1 \
         libstdc++6 \
         libvulkan1 \

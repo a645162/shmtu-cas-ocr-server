@@ -92,6 +92,10 @@ cmake --build --preset build-linux-system-vulkan
 * 将产物复制回工作区 `build/linux-system-vulkan/` 和 `docker-runtime/`
 * 再用 [Dockerfile.runtime-system](/home/konghaomin/Prj/SHMTU/shmtu-terminal/Server/shmtu-cas-ocr-server/Dockerfile.runtime-system:1) 构建 runtime 镜像
 
+说明：
+
+* `./scripts/ci_build_system_vulkan.sh` 不启用 `chsrc`，GitHub Actions 也走这条默认路径。
+
 如果你在本地 Ubuntu 上遇到 `apt` 源较慢，使用本地 wrapper 即可。它和 CI 走同一套 Docker 构建脚本，只是在 builder 镜像内额外执行 `chsrc set ubuntu`：
 
 ```bash
