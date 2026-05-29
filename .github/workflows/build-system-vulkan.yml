@@ -1,47 +1,12 @@
 name: Publish System Docker Images
 
 on:
-  workflow_dispatch:
   push:
-    branches:
-      - main
-      - master
-    paths:
-      - ".github/workflows/build-system-vulkan.yml"
-      - "CMakeLists.txt"
-      - "VERSION"
-      - "CMakePresets.json"
-      - "cmake/ShmtuVersion.cmake"
-      - "Dockerfile.builder-system"
-      - "Dockerfile.runtime-system-cpu"
-      - "Dockerfile.runtime-system-vulkan"
-      - "scripts/download_models.py"
-      - "scripts/docker_build_system.sh"
-      - "scripts/docker_build_system_vulkan.sh"
-      - "scripts/ci_build_system_vulkan.sh"
-      - "scripts/verify_runtime_images.sh"
-      - "3rdparty/NCNN/**"
-      - "ocr/**"
-  pull_request:
-    paths:
-      - ".github/workflows/build-system-vulkan.yml"
-      - "CMakeLists.txt"
-      - "VERSION"
-      - "CMakePresets.json"
-      - "cmake/ShmtuVersion.cmake"
-      - "Dockerfile.builder-system"
-      - "Dockerfile.runtime-system-cpu"
-      - "Dockerfile.runtime-system-vulkan"
-      - "scripts/download_models.py"
-      - "scripts/docker_build_system.sh"
-      - "scripts/docker_build_system_vulkan.sh"
-      - "scripts/ci_build_system_vulkan.sh"
-      - "scripts/verify_runtime_images.sh"
-      - "3rdparty/NCNN/**"
-      - "ocr/**"
+    tags:
+      - "*"
 
 permissions:
-  contents: read
+  contents: write
   packages: write
 
 env:
@@ -52,10 +17,13 @@ jobs:
   prepare-environment:
     runs-on: ubuntu-24.04
     outputs:
+      release-tag: ${{ steps.set-version.outputs.release-tag }}
+      release-version: ${{ steps.set-version.outputs.release-version }}
       suite-version: ${{ steps.set-version.outputs.suite-version }}
       server-version: ${{ steps.set-version.outputs.server-version }}
       version-major: ${{ steps.set-version.outputs.version-major }}
       version-minor: ${{ steps.set-version.outputs.version-minor }}
+      is-tag-release: ${{ steps.set-version.outputs.is-tag-release }}
       acr-registry: ${{ steps.set-acr.outputs.acr-registry }}
     steps:
       - name: Checkout source
@@ -65,16 +33,33 @@ jobs:
         id: set-version
         run: |
           SUITE_VERSION="$(tr -d '\n\r' < VERSION)"
+          RELEASE_TAG=""
+          RELEASE_VERSION="${SUITE_VERSION}"
+          IS_TAG_RELEASE="false"
           if ! [[ "${SUITE_VERSION}" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
             echo "Invalid semantic version in VERSION: ${SUITE_VERSION}" >&2
             exit 1
           fi
+          if [[ "${GITHUB_REF}" == refs/tags/* ]]; then
+            RELEASE_TAG="${GITHUB_REF_NAME}"
+            RELEASE_VERSION="${RELEASE_TAG#v}"
+            IS_TAG_RELEASE="true"
+            if [[ "${RELEASE_VERSION}" != "${SUITE_VERSION}" ]]; then
+              echo "Tag version (${RELEASE_VERSION}) does not match VERSION (${SUITE_VERSION})." >&2
+              exit 1
+            fi
+          fi
           IFS='.' read -r VERSION_MAJOR VERSION_MINOR VERSION_PATCH <<< "${SUITE_VERSION}"
           SERVER_VERSION="${SUITE_VERSION}"
+          echo "release-tag=${RELEASE_TAG}" >> "${GITHUB_OUTPUT}"
+          echo "release-version=${RELEASE_VERSION}" >> "${GITHUB_OUTPUT}"
           echo "suite-version=${SUITE_VERSION}" >> "${GITHUB_OUTPUT}"
           echo "server-version=${SERVER_VERSION}" >> "${GITHUB_OUTPUT}"
           echo "version-major=${VERSION_MAJOR}" >> "${GITHUB_OUTPUT}"
           echo "version-minor=${VERSION_MAJOR}.${VERSION_MINOR}" >> "${GITHUB_OUTPUT}"
+          echo "is-tag-release=${IS_TAG_RELEASE}" >> "${GITHUB_OUTPUT}"
+          echo "RELEASE_TAG=${RELEASE_TAG}" >> "${GITHUB_ENV}"
+          echo "RELEASE_VERSION=${RELEASE_VERSION}" >> "${GITHUB_ENV}"
           echo "SUITE_VERSION=${SUITE_VERSION}" >> "${GITHUB_ENV}"
           echo "SERVER_VERSION=${SERVER_VERSION}" >> "${GITHUB_ENV}"
           echo "VERSION_MAJOR=${VERSION_MAJOR}" >> "${GITHUB_ENV}"
@@ -82,6 +67,8 @@ jobs:
 
       - name: Print release versions
         run: |
+          echo "Release tag:    '${{ env.RELEASE_TAG }}'"
+          echo "Release version:'${{ env.RELEASE_VERSION }}'"
           echo "Suite version:  '${{ env.SUITE_VERSION }}'"
           echo "Server version: '${{ env.SERVER_VERSION }}'"
 
@@ -131,6 +118,7 @@ jobs:
 
       - name: Export program version
         run: |
+          echo "RELEASE_VERSION=${{ needs.prepare-environment.outputs.release-version }}" >> "${GITHUB_ENV}"
           echo "SUITE_VERSION=${{ needs.prepare-environment.outputs.suite-version }}" >> "${GITHUB_ENV}"
           echo "SERVER_VERSION=${{ needs.prepare-environment.outputs.server-version }}" >> "${GITHUB_ENV}"
 
@@ -138,6 +126,14 @@ jobs:
         run: |
           chmod +x scripts/docker_build_system.sh
           ./scripts/docker_build_system.sh "${{ matrix.variant }}"
+
+      - name: Stage release executables
+        run: |
+          bash ./scripts/stage_binaries.sh \
+            --build-dir "${{ matrix.build_dir }}" \
+            --release-dir "release-assets/${{ matrix.variant }}" \
+            --platform-id "ubuntu2404-linux-x64" \
+            --variant "${{ matrix.variant }}"
 
       - name: Verify bundled and non-bundled images
         run: |
@@ -154,10 +150,11 @@ jobs:
         with:
           name: ${{ matrix.artifact_name }}
           path: |
-            ${{ matrix.build_dir }}/ocr/shmtu-cas-ocr-server/shmtu_cas_ocr_server
-            ${{ matrix.build_dir }}/ocr/shmtu-cas-ocr-cli/shmtu_cas_ocr_cli
+            ${{ matrix.build_dir }}/ocr/shmtu-cas-ocr-server/shmtu_cas_ocr_server*
+            ${{ matrix.build_dir }}/ocr/shmtu-cas-ocr-cli/shmtu_cas_ocr_cli*
             docker-runtime/shmtu_cas_ocr_server
             docker-runtime/shmtu_cas_ocr_cli
+            release-assets/${{ matrix.variant }}/*
             ${{ matrix.archive_name }}
             ${{ matrix.bundled_archive_name }}
 
@@ -438,3 +435,43 @@ jobs:
             )
           fi
           docker buildx imagetools create "${BUNDLED_ARGS[@]}" "${BUNDLED_REF}"
+
+  publish-release:
+    if: needs.prepare-environment.outputs.is-tag-release == 'true'
+    runs-on: ubuntu-24.04
+    needs:
+      - prepare-environment
+      - build-runtime-image
+    steps:
+      - name: Download CPU artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: ubuntu-2404-cpu-artifacts
+          path: ./artifact/cpu
+
+      - name: Download Vulkan artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: ubuntu-2404-vulkan-artifacts
+          path: ./artifact/vulkan
+
+      - name: Collect release assets
+        run: |
+          mkdir -p release-assets
+          cp ./artifact/cpu/release-assets/cpu/* release-assets/
+          cp ./artifact/vulkan/release-assets/vulkan/* release-assets/
+          (
+            cd release-assets
+            sha256sum * > SHA256SUMS.txt
+          )
+          ls -l release-assets
+
+      - name: Publish GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ needs.prepare-environment.outputs.release-tag }}
+          name: ${{ needs.prepare-environment.outputs.release-tag }}
+          generate_release_notes: true
+          fail_on_unmatched_files: true
+          files: |
+            release-assets/*

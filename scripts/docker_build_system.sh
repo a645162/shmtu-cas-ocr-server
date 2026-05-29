@@ -68,8 +68,9 @@ docker run --rm \
     mkdir -p docker-runtime
     cmake --preset ${CMAKE_PRESET}
     cmake --build --preset ${BUILD_PRESET} --target shmtu_cas_ocr_server shmtu_cas_ocr_cli
-    cp build/${CMAKE_PRESET}/ocr/shmtu-cas-ocr-server/shmtu_cas_ocr_server docker-runtime/
-    cp build/${CMAKE_PRESET}/ocr/shmtu-cas-ocr-cli/shmtu_cas_ocr_cli docker-runtime/
+    bash scripts/stage_binaries.sh \
+      --build-dir build/${CMAKE_PRESET} \
+      --docker-dir docker-runtime
   "
 
 echo "[4/5] Building runtime image from copied artifacts..."

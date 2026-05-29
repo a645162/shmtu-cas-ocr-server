@@ -49,12 +49,13 @@ docker run --rm \
     mkdir -p docker-runtime
     cmake --preset linux-system-vulkan
     cmake --build --preset build-linux-system-vulkan --target shmtu_cas_ocr_server shmtu_cas_ocr_cli
-    cp build/linux-system-vulkan/ocr/shmtu-cas-ocr-server/shmtu_cas_ocr_server docker-runtime/
-    cp build/linux-system-vulkan/ocr/shmtu-cas-ocr-cli/shmtu_cas_ocr_cli docker-runtime/
+    bash scripts/stage_binaries.sh \
+      --build-dir build/linux-system-vulkan \
+      --docker-dir docker-runtime
   '
 
 echo "[4/5] Building runtime image from copied artifacts..."
-docker build -f Dockerfile.runtime-system -t "${RUNTIME_IMAGE}" .
+docker build -f Dockerfile.runtime-system-vulkan -t "${RUNTIME_IMAGE}" .
 
 echo "[5/5] Done."
 echo "Binaries:"

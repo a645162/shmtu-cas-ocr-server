@@ -163,18 +163,24 @@ void register_http_handlers(OcrServer::Impl& impl, OcrServer& server) {
             const auto request_id = impl.request_sequence.fetch_add(1) + 1;
             const auto client = describe_http_client(req);
             const auto health = server.health();
-            LOG(INFO) << "HTTP GET /api/health begin"
-                      << " request_id=" << request_id
-                      << " client=" << client;
-            log_http_request_snapshot(impl, request_id, client, "/api/health");
+            VLOG(1) << "HTTP GET /api/health begin"
+                    << " request_id=" << request_id
+                    << " client=" << client;
+            VLOG(1) << "HTTP request snapshot"
+                    << " request_id=" << request_id
+                    << " route=/api/health"
+                    << " client=" << client
+                    << " pending_requests=" << (impl.pool ? impl.pool->pending_tasks.load() : 0)
+                    << " active_workers=" << (impl.pool ? impl.pool->active_workers.load() : 0)
+                    << " queue_capacity=" << impl.config.queue_capacity;
             callback(make_json_response(health_to_json(health)));
-            LOG(INFO) << "HTTP GET /api/health completed"
-                      << " request_id=" << request_id
-                      << " client=" << client
-                      << " status=200"
-                      << " health_status=" << health.status
-                      << " models_loaded=" << health.models_loaded
-                      << " pending_requests=" << health.pending_requests;
+            VLOG(1) << "HTTP GET /api/health completed"
+                    << " request_id=" << request_id
+                    << " client=" << client
+                    << " status=200"
+                    << " health_status=" << health.status
+                    << " models_loaded=" << health.models_loaded
+                    << " pending_requests=" << health.pending_requests;
         },
         {drogon::Get});
 
