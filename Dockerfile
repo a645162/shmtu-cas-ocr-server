@@ -90,3 +90,14 @@ EXPOSE 21601
 
 ENTRYPOINT ["/opt/shmtu/bin/shmtu_cas_ocr_server"]
 CMD ["--model-dir", "/app/models", "--http-port", "21600", "--tcp-port", "21601", "--use-gpu"]
+
+# ============================================================
+# Bundled variants (with model weights included)
+# ============================================================
+FROM runtime-cpu AS runtime-cpu-bundled
+
+COPY models/ /app/models/
+
+FROM runtime-gpu AS runtime-gpu-bundled
+
+COPY models/ /app/models/

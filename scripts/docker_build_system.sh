@@ -7,6 +7,7 @@ PROJECT_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 
 VARIANT="${1:-vulkan}"
 USE_CHSRC="${USE_CHSRC:-0}"
+BUILD_BUNDLED="${BUILD_BUNDLED:-1}"
 
 if [ "${VARIANT}" = "vulkan" ]; then
   CMAKE_PRESET="linux-system-vulkan"
@@ -80,3 +81,12 @@ echo "  ${PROJECT_ROOT}/build/${CMAKE_PRESET}/ocr/shmtu-cas-ocr-server/shmtu_cas
 echo "  ${PROJECT_ROOT}/build/${CMAKE_PRESET}/ocr/shmtu-cas-ocr-cli/shmtu_cas_ocr_cli"
 echo "Runtime image:"
 echo "  ${RUNTIME_IMAGE}"
+
+if [ "${BUILD_BUNDLED}" = "1" ]; then
+  echo "[5.5/5] Building bundled image with model weights..."
+  python3 scripts/download_models.py
+  docker build -f "${RUNTIME_DOCKERFILE}" --target bundled -t "${RUNTIME_IMAGE}-bundled" .
+
+  echo "Bundled image:"
+  echo "  ${RUNTIME_IMAGE}-bundled"
+fi

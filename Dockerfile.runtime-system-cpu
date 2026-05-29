@@ -1,4 +1,4 @@
-FROM ubuntu:24.04
+FROM ubuntu:24.04 AS runtime
 
 ENV DEBIAN_FRONTEND=noninteractive
 ENV SHMTU_MODEL_DIR=/app/models
@@ -41,3 +41,7 @@ EXPOSE 21600
 EXPOSE 21601
 
 ENTRYPOINT ["/opt/shmtu/bin/shmtu_cas_ocr_server"]
+
+# Bundled variant (with model weights included)
+FROM runtime AS bundled
+COPY models/ /app/models/

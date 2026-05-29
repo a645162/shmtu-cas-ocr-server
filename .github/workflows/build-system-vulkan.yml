@@ -15,6 +15,7 @@ on:
       - "Dockerfile.builder-system"
       - "Dockerfile.runtime-system-cpu"
       - "Dockerfile.runtime-system-vulkan"
+      - "scripts/download_models.py"
       - "scripts/docker_build_system.sh"
       - "scripts/docker_build_system_vulkan.sh"
       - "scripts/ci_build_system_vulkan.sh"
@@ -30,6 +31,7 @@ on:
       - "Dockerfile.builder-system"
       - "Dockerfile.runtime-system-cpu"
       - "Dockerfile.runtime-system-vulkan"
+      - "scripts/download_models.py"
       - "scripts/docker_build_system.sh"
       - "scripts/docker_build_system_vulkan.sh"
       - "scripts/ci_build_system_vulkan.sh"
@@ -100,17 +102,25 @@ jobs:
         include:
           - variant: cpu
             local_image: shmtu-cas-ocr-server:cpu
+            bundled_local_image: shmtu-cas-ocr-server:cpu-bundled
             artifact_name: ubuntu-2404-cpu-artifacts
             build_dir: build/linux-system
             archive_name: shmtu-cas-ocr-server-cpu.tar
+            bundled_archive_name: shmtu-cas-ocr-server-cpu-bundled.tar
           - variant: vulkan
             local_image: shmtu-cas-ocr-server:vulkan
+            bundled_local_image: shmtu-cas-ocr-server:vulkan-bundled
             artifact_name: ubuntu-2404-vulkan-artifacts
             build_dir: build/linux-system-vulkan
             archive_name: shmtu-cas-ocr-server-vulkan.tar
+            bundled_archive_name: shmtu-cas-ocr-server-vulkan-bundled.tar
     steps:
       - name: Checkout source
         uses: actions/checkout@v4
+
+      - name: Download model weights
+        run: |
+          python3 scripts/download_models.py
 
       - name: Verify host tools
         run: |
@@ -127,9 +137,10 @@ jobs:
           chmod +x scripts/docker_build_system.sh
           ./scripts/docker_build_system.sh "${{ matrix.variant }}"
 
-      - name: Export runtime image
+      - name: Export runtime images
         run: |
           docker save "${{ matrix.local_image }}" -o "${{ matrix.archive_name }}"
+          docker save "${{ matrix.bundled_local_image }}" -o "${{ matrix.bundled_archive_name }}"
 
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4
@@ -141,6 +152,7 @@ jobs:
             docker-runtime/shmtu_cas_ocr_server
             docker-runtime/shmtu_cas_ocr_cli
             ${{ matrix.archive_name }}
+            ${{ matrix.bundled_archive_name }}
 
   push-ghcr:
     if: github.event_name != 'pull_request'
@@ -153,15 +165,19 @@ jobs:
         include:
           - variant: cpu
             local_image: shmtu-cas-ocr-server:cpu
+            bundled_local_image: shmtu-cas-ocr-server:cpu-bundled
             artifact_name: ubuntu-2404-cpu-artifacts
             archive_name: shmtu-cas-ocr-server-cpu.tar
+            bundled_archive_name: shmtu-cas-ocr-server-cpu-bundled.tar
             tag_suffix: cpu
             publish_bare: "true"
             publish_variant_alias: "true"
           - variant: vulkan
             local_image: shmtu-cas-ocr-server:vulkan
+            bundled_local_image: shmtu-cas-ocr-server:vulkan-bundled
             artifact_name: ubuntu-2404-vulkan-artifacts
             archive_name: shmtu-cas-ocr-server-vulkan.tar
+            bundled_archive_name: shmtu-cas-ocr-server-vulkan-bundled.tar
             tag_suffix: vulkan
             publish_bare: "false"
             publish_variant_alias: "true"
@@ -178,9 +194,10 @@ jobs:
           name: ${{ matrix.artifact_name }}
           path: ./artifact
 
-      - name: Load runtime image
+      - name: Load runtime images
         run: |
           docker load -i "./artifact/${{ matrix.archive_name }}"
+          docker load -i "./artifact/${{ matrix.bundled_archive_name }}"
 
       - name: Login to GitHub Container Registry
         uses: docker/login-action@v3
@@ -211,6 +228,31 @@ jobs:
           fi
           for tag in "${TAGS[@]}"; do
             docker tag "${{ matrix.local_image }}" "${IMAGE_BASE}:${tag}"
+            docker push "${IMAGE_BASE}:${tag}"
+          done
+
+      - name: Tag and push bundled image to GHCR
+        run: |
+          IMAGE_BASE="ghcr.io/${{ github.repository }}"
+          BUNDLED_TAGS=()
+          if [ "${{ matrix.publish_bare }}" = "true" ]; then
+            BUNDLED_TAGS+=(
+              "${SERVER_VERSION}-bundled"
+              "${VERSION_MINOR}-bundled"
+              "${VERSION_MAJOR}-bundled"
+              "latest-bundled"
+            )
+          fi
+          if [ "${{ matrix.publish_variant_alias }}" = "true" ]; then
+            BUNDLED_TAGS+=(
+              "${SERVER_VERSION}-${{ matrix.tag_suffix }}-bundled"
+              "${VERSION_MINOR}-${{ matrix.tag_suffix }}-bundled"
+              "${VERSION_MAJOR}-${{ matrix.tag_suffix }}-bundled"
+              "latest-${{ matrix.tag_suffix }}-bundled"
+            )
+          fi
+          for tag in "${BUNDLED_TAGS[@]}"; do
+            docker tag "${{ matrix.bundled_local_image }}" "${IMAGE_BASE}:${tag}"
             docker push "${IMAGE_BASE}:${tag}"
           done
 
@@ -280,6 +322,27 @@ jobs:
           fi
           docker buildx imagetools create "${TAG_ARGS[@]}" "${IMAGE_REF}"
 
+          # Copy bundled image
+          BUNDLED_REF="ghcr.io/${{ github.repository }}:${{ env.SERVER_VERSION }}-${{ matrix.tag_suffix }}-bundled"
+          BUNDLED_ARGS=()
+          if [ "${{ matrix.publish_bare }}" = "true" ]; then
+            BUNDLED_ARGS+=(
+              --tag "${{ env.DOCKER_HUB_REPO }}:${{ env.SERVER_VERSION }}-bundled"
+              --tag "${{ env.DOCKER_HUB_REPO }}:${{ env.VERSION_MINOR }}-bundled"
+              --tag "${{ env.DOCKER_HUB_REPO }}:${{ env.VERSION_MAJOR }}-bundled"
+              --tag "${{ env.DOCKER_HUB_REPO }}:latest-bundled"
+            )
+          fi
+          if [ "${{ matrix.publish_variant_alias }}" = "true" ]; then
+            BUNDLED_ARGS+=(
+              --tag "${{ env.DOCKER_HUB_REPO }}:${{ env.SERVER_VERSION }}-${{ matrix.tag_suffix }}-bundled"
+              --tag "${{ env.DOCKER_HUB_REPO }}:${{ env.VERSION_MINOR }}-${{ matrix.tag_suffix }}-bundled"
+              --tag "${{ env.DOCKER_HUB_REPO }}:${{ env.VERSION_MAJOR }}-${{ matrix.tag_suffix }}-bundled"
+              --tag "${{ env.DOCKER_HUB_REPO }}:latest-${{ matrix.tag_suffix }}-bundled"
+            )
+          fi
+          docker buildx imagetools create "${BUNDLED_ARGS[@]}" "${BUNDLED_REF}"
+
   push-aliyun:
     if: github.event_name != 'pull_request'
     runs-on: ubuntu-24.04
@@ -347,3 +410,24 @@ jobs:
             )
           fi
           docker buildx imagetools create "${TAG_ARGS[@]}" "${IMAGE_REF}"
+
+          # Copy bundled image
+          BUNDLED_REF="ghcr.io/${{ github.repository }}:${{ env.SERVER_VERSION }}-${{ matrix.tag_suffix }}-bundled"
+          BUNDLED_ARGS=()
+          if [ "${{ matrix.publish_bare }}" = "true" ]; then
+            BUNDLED_ARGS+=(
+              --tag "${{ env.ACR_REGISTRY }}/${{ env.DOCKER_HUB_REPO }}:${{ env.SERVER_VERSION }}-bundled"
+              --tag "${{ env.ACR_REGISTRY }}/${{ env.DOCKER_HUB_REPO }}:${{ env.VERSION_MINOR }}-bundled"
+              --tag "${{ env.ACR_REGISTRY }}/${{ env.DOCKER_HUB_REPO }}:${{ env.VERSION_MAJOR }}-bundled"
+              --tag "${{ env.ACR_REGISTRY }}/${{ env.DOCKER_HUB_REPO }}:latest-bundled"
+            )
+          fi
+          if [ "${{ matrix.publish_variant_alias }}" = "true" ]; then
+            BUNDLED_ARGS+=(
+              --tag "${{ env.ACR_REGISTRY }}/${{ env.DOCKER_HUB_REPO }}:${{ env.SERVER_VERSION }}-${{ matrix.tag_suffix }}-bundled"
+              --tag "${{ env.ACR_REGISTRY }}/${{ env.DOCKER_HUB_REPO }}:${{ env.VERSION_MINOR }}-${{ matrix.tag_suffix }}-bundled"
+              --tag "${{ env.ACR_REGISTRY }}/${{ env.DOCKER_HUB_REPO }}:${{ env.VERSION_MAJOR }}-${{ matrix.tag_suffix }}-bundled"
+              --tag "${{ env.ACR_REGISTRY }}/${{ env.DOCKER_HUB_REPO }}:latest-${{ matrix.tag_suffix }}-bundled"
+            )
+          fi
+          docker buildx imagetools create "${BUNDLED_ARGS[@]}" "${BUNDLED_REF}"

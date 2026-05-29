@@ -4,6 +4,18 @@
 
 ## 脚本列表
 
+### `download_models.py`
+
+下载项目默认使用的 NCNN 权重到 `${PROJECT_ROOT}/models`。
+
+示例：
+
+```bash
+python3 ./scripts/download_models.py
+python3 ./scripts/download_models.py --force
+python3 ./scripts/download_models.py --dest /tmp/shmtu-models
+```
+
 ### `run_server.py`
 
 启动 `shmtu_cas_ocr_server`。
