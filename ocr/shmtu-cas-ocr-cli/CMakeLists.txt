@@ -5,17 +5,10 @@ project(shmtu-cas-ocr-cli VERSION ${PROJECT_VERSION} LANGUAGES CXX)
 # --------------------------------------------------------------------------
 # Dependencies
 # --------------------------------------------------------------------------
-find_package(fmt REQUIRED)
-
-# cpp-httplib is header-only; include from 3rdparty
-include_directories(
-    ${CMAKE_SOURCE_DIR}/3rdparty/cpp-httplib
-)
-
-# Tclap is header-only; include from 3rdparty
-include_directories(
-    ${CMAKE_SOURCE_DIR}/3rdparty/Tclap/tclap-1.4.0-rc1/include
-)
+find_package(CLI11 CONFIG QUIET)
+if(NOT CLI11_FOUND)
+    find_package(CLI11 REQUIRED)
+endif()
 
 # cpp-httplib requires threading
 find_package(Threads REQUIRED)
@@ -32,6 +25,11 @@ endif()
 # Sources
 # --------------------------------------------------------------------------
 set(CLI_SOURCES
+    src/cli_config.cpp
+    src/cli_files.cpp
+    src/cli_json.cpp
+    src/cli_remote.cpp
+    src/cli_runner.cpp
     src/main.cpp
 )
 
@@ -45,10 +43,16 @@ shmtu_apply_target_version(
     "${SHMTU_CAS_CLI_VERSION}"
 )
 
+target_include_directories(shmtu_cas_ocr_cli
+    PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/src
+        ${CMAKE_SOURCE_DIR}/3rdparty/cpp-httplib
+)
+
 target_link_libraries(shmtu_cas_ocr_cli
     PRIVATE
         SHMTU::CasOcrLib
-        fmt::fmt
+        CLI11::CLI11
         Threads::Threads
 )
 

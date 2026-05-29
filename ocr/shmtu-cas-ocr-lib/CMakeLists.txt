@@ -12,10 +12,12 @@ find_package(ncnn REQUIRED)
 # Sources — core OCR (always compiled)
 # --------------------------------------------------------------------------
 set(LIB_SOURCES
+    src/base64.cpp
     src/cas_ocr.cpp
 )
 
 set(LIB_HEADERS_PUBLIC
+    include/shmtu/cas_ocr/base64.h
     include/shmtu/cas_ocr/cas_ocr.h
     include/shmtu/cas_ocr/types.h
     ${CMAKE_CURRENT_BINARY_DIR}/generated/include/shmtu/cas_ocr/version.h

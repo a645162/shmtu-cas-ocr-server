@@ -20,7 +20,14 @@ struct ServerConfig {
     int worker_count = 0;
     int queue_capacity = 0;
     int inference_threads = 0;
-    int log_level = 2;
+    std::string log_dir = "./logs";
+    std::string log_file_prefix = "shmtu_cas_ocr_server";
+    int log_min_level = 0;
+    bool log_to_stderr = false;
+    bool also_log_to_stderr = true;
+    int log_max_size_mb = 10;
+    int log_cleanup_interval_secs = 3600;
+    int log_retention_days = 7;
 
     std::string server_name;
 };

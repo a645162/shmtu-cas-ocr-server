@@ -2,7 +2,7 @@
   "name": "shmtu-cas-ocr-server",
   "version-string": "1.0.0",
   "dependencies": [
-    "fmt",
+    "cli11",
     {
       "name": "opencv4",
       "default-features": false,
@@ -14,6 +14,7 @@
       ]
     },
     "ncnn",
+    "glog",
     "drogon",
     "trantor"
   ],

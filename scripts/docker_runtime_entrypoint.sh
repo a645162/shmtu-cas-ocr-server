@@ -4,7 +4,17 @@ set -euo pipefail
 
 SERVER_BIN="${SHMTU_SERVER_BIN:-/opt/shmtu/bin/shmtu_cas_ocr_server}"
 DOWNLOAD_MODELS_BIN="${SHMTU_DOWNLOAD_MODELS_BIN:-/opt/shmtu/bin/docker_download_models.sh}"
+LOG_DIR="${SHMTU_LOG_DIR:-/app/logs}"
+LOG_FILE="${SHMTU_LOG_FILE:-${LOG_DIR%/}/shmtu-cas-ocr-server.log}"
 SERVER_ARGS=()
+
+mkdir -p "${LOG_DIR}" "$(dirname "${LOG_FILE}")"
+touch "${LOG_FILE}"
+exec > >(tee -a "${LOG_FILE}") 2>&1
+
+log() {
+  printf '[%s] %s\n' "$(date '+%Y-%m-%d %H:%M:%S%z')" "$*"
+}
 
 while [ "$#" -gt 0 ]; do
   case "$1" in
@@ -47,6 +57,17 @@ while [ "$#" -gt 0 ]; do
   esac
 done
 
+log "Runtime entrypoint initialized"
+log "  server_bin=${SERVER_BIN}"
+log "  download_models_bin=${DOWNLOAD_MODELS_BIN}"
+log "  log_dir=${LOG_DIR}"
+log "  log_file=${LOG_FILE}"
+log "  model_dir=${SHMTU_MODEL_DIR:-/app/models}"
+log "  model_source=${SHMTU_MODEL_SOURCE:-github}"
+log "  auto_download_models=${SHMTU_AUTO_DOWNLOAD_MODELS:-1}"
+log "  server_args=${SERVER_ARGS[*]:-<none>}"
+
 bash "${DOWNLOAD_MODELS_BIN}" "${SERVER_ARGS[@]}"
 
-exec "${SERVER_BIN}" "${SERVER_ARGS[@]}"
+log "Starting OCR server"
+exec stdbuf -oL -eL "${SERVER_BIN}" "${SERVER_ARGS[@]}"

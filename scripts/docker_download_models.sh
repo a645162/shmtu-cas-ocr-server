@@ -9,6 +9,10 @@ MODEL_SOURCE="${SHMTU_MODEL_SOURCE:-github}"
 PRIMARY_BASE_URL="${SHMTU_MODEL_BASE_URL:-https://github.com/a645162/shmtu-cas-ocr-model/releases/download/v1.0-NCNN}"
 FALLBACK_BASE_URL="${SHMTU_MODEL_FALLBACK_BASE_URL:-https://gitee.com/a645162/shmtu-cas-ocr-model/releases/download/v1.0-NCNN}"
 
+log() {
+  printf '[%s] %s\n' "$(date '+%Y-%m-%d %H:%M:%S%z')" "$*"
+}
+
 while [ "$#" -gt 0 ]; do
   case "$1" in
     --model-dir)
@@ -114,7 +118,7 @@ for filename in "${MODEL_FILES[@]}"; do
 done
 
 if [ "${#missing_files[@]}" -eq 0 ]; then
-  echo "Model bootstrap: all required files already exist in ${MODEL_DIR}"
+  log "Model bootstrap: all required files already exist in ${MODEL_DIR}"
   exit 0
 fi
 
@@ -124,12 +128,20 @@ if [ "${AUTO_DOWNLOAD_MODELS}" != "1" ]; then
   exit 1
 fi
 
-echo "Model bootstrap: downloading missing files into ${MODEL_DIR}"
+log "Model bootstrap: begin"
+log "  model_dir=${MODEL_DIR}"
+log "  precision=${PRECISION}"
+log "  model_source=${MODEL_SOURCE}"
+log "  primary_base_url=${PRIMARY_BASE_URL}"
+log "  fallback_base_url=${FALLBACK_BASE_URL}"
+log "  missing_files=${missing_files[*]}"
+log "Model bootstrap: downloading missing files into ${MODEL_DIR}"
 for filename in "${missing_files[@]}"; do
-  echo "  downloading ${filename}"
+  log "  downloading ${filename} from primary source"
   if download_one "${PRIMARY_BASE_URL}" "${filename}" "${MODEL_DIR}/${filename}"; then
     continue
   fi
+  log "  primary source failed for ${filename}, trying fallback source"
   if download_one "${FALLBACK_BASE_URL}" "${filename}" "${MODEL_DIR}/${filename}"; then
     continue
   fi
@@ -144,4 +156,4 @@ for filename in "${MODEL_FILES[@]}"; do
   fi
 done
 
-echo "Model bootstrap: model files are ready in ${MODEL_DIR}"
+log "Model bootstrap: model files are ready in ${MODEL_DIR}"

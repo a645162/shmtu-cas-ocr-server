@@ -82,7 +82,6 @@ endif()
 if(WIN32)
     set(OpenCV_DIR       "${CMAKE_SOURCE_DIR}/3rdparty/OpenCV/opencv500-vs2022/install")
     set(Poco_DIR         "${CMAKE_SOURCE_DIR}/3rdparty/Poco/poco-poco-1.13.2-build/install/cmake")
-    set(fmt_DIR          "${CMAKE_SOURCE_DIR}/3rdparty/fmt/fmt-10.2.1-build/install/lib/cmake/fmt")
 
     if(CMAKE_BUILD_TYPE STREQUAL "Debug")
         set(ncnn_DIR     "${CMAKE_SOURCE_DIR}/3rdparty/NCNN/ncnn-vs2022-debug/install/lib/cmake/ncnn")

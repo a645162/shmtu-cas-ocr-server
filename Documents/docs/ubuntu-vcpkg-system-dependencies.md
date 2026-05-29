@@ -27,8 +27,9 @@ sudo apt-get install -y \
   pkg-config \
   python3 \
   ca-certificates \
+  libcli11-dev \
   libopencv-dev \
-  libfmt-dev \
+  libgoogle-glog-dev \
   libdrogon-dev \
   libtrantor-dev \
   libjsoncpp-dev \
@@ -158,11 +159,11 @@ added to `vcpkg.json`.
 
 The current manifest-managed project stack includes:
 
+* `cli11`
 * `drogon`
 * `trantor`
 * `ncnn`
 * `opencv4`
-* `fmt`
 * `Qt6` from Ubuntu `apt`
 
 Vulkan support is enabled through the manifest feature:

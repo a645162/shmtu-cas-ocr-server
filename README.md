@@ -43,7 +43,7 @@ python3 3rdparty/NCNN/download_ncnn.py --tag 20260526 --ubuntu 2404
 
 当前 `vcpkg.json` 中的主要依赖为：
 
-* `fmt`
+* `cli11`
 * `opencv4`
 * `ncnn`
 * `drogon`
@@ -112,7 +112,7 @@ cmake --build --preset build-linux-system-vulkan-gui
 说明：
 
 * 这条路径不会使用 `vcpkg` toolchain
-* `OpenCV`、`fmt`、`Drogon`、`Trantor`、`Qt6`、`CURL`、`OpenSSL` 会优先由系统包提供
+* `CLI11`、`glog`、`OpenCV`、`Drogon`、`Trantor`、`Qt6`、`CURL`、`OpenSSL` 会优先由系统包提供
 * `libdrogon-dev` 在 Ubuntu 上还需要 `default-libmysqlclient-dev` 和 `libhiredis-dev`
 * `ncnn` 推荐使用 Tencent GitHub Release 的 Ubuntu 24.04 预编译包
 * 在 Linux 下当前工程会优先尝试 `SHMTU_NCNN_ROOT`、`NCNN_ROOT`、`3rdparty/NCNN/` 下的本地包

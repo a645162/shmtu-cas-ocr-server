@@ -61,7 +61,7 @@ COPY --from=builder-cpu /build/build/linux-vcpkg/vcpkg_installed /opt/shmtu/vcpk
 COPY scripts/docker_download_models.sh /opt/shmtu/bin/docker_download_models.sh
 COPY scripts/docker_runtime_entrypoint.sh /opt/shmtu/bin/docker_runtime_entrypoint.sh
 
-RUN mkdir -p /app/models
+RUN mkdir -p /app/models /app/logs
 RUN chmod +x /opt/shmtu/bin/docker_download_models.sh /opt/shmtu/bin/docker_runtime_entrypoint.sh
 
 WORKDIR /app
@@ -92,7 +92,7 @@ COPY --from=builder-gpu /build/build/linux-vcpkg-vulkan/vcpkg_installed /opt/shm
 COPY scripts/docker_download_models.sh /opt/shmtu/bin/docker_download_models.sh
 COPY scripts/docker_runtime_entrypoint.sh /opt/shmtu/bin/docker_runtime_entrypoint.sh
 
-RUN mkdir -p /app/models
+RUN mkdir -p /app/models /app/logs
 RUN chmod +x /opt/shmtu/bin/docker_download_models.sh /opt/shmtu/bin/docker_runtime_entrypoint.sh
 
 WORKDIR /app

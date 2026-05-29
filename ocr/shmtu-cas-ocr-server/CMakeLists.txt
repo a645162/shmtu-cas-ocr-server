@@ -2,11 +2,22 @@ cmake_minimum_required(VERSION 3.20)
 
 project(shmtu-cas-ocr-server VERSION ${PROJECT_VERSION} LANGUAGES CXX)
 
+find_package(CLI11 CONFIG QUIET)
+if(NOT CLI11_FOUND)
+    find_package(CLI11 REQUIRED)
+endif()
 find_package(Drogon REQUIRED CONFIG)
 find_package(Trantor REQUIRED CONFIG)
+find_package(glog CONFIG QUIET)
+if(NOT glog_FOUND)
+    find_package(glog REQUIRED)
+endif()
 
 set(SERVER_SOURCES
+    src/logging.cpp
     src/main.cpp
+    src/server_config.cpp
+    src/server_startup.cpp
     src/server.cpp
     src/server_http.cpp
     src/server_tcp.cpp
@@ -28,8 +39,10 @@ target_include_directories(shmtu_cas_ocr_server
 target_link_libraries(shmtu_cas_ocr_server
     PRIVATE
         SHMTU::CasOcrLib
+        CLI11::CLI11
         Drogon::Drogon
         Trantor::Trantor
+        glog::glog
 )
 
 if(MSVC)

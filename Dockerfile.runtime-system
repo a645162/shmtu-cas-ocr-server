@@ -17,6 +17,7 @@ RUN apt-get update \
         libopencv-core406t64 \
         libopencv-imgproc406t64 \
         libopencv-imgcodecs406t64 \
+        libgoogle-glog0v6t64 \
         libjsoncpp25 \
         libyaml-cpp0.8 \
         libssl3t64 \
@@ -34,7 +35,7 @@ RUN apt-get update \
         curl \
     && rm -rf /var/lib/apt/lists/*
 
-RUN mkdir -p /opt/shmtu/bin /app/models
+RUN mkdir -p /opt/shmtu/bin /app/models /app/logs
 
 WORKDIR /app
 

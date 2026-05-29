@@ -8,11 +8,13 @@ services:
     ports:
       - "21600:21600"
       - "21601:21601"
-    # 这里不建议给:ro，因为模型文件可能不存在，需要在容器启动时下载并写入模型文件
-    # volumes:
-    #   - ./models:/app/models
+    volumes:
+      - ./models:/app/models
+      - ./logs:/app/logs
     environment:
       SHMTU_MODEL_DIR: /app/models
+      SHMTU_LOG_DIR: /app/logs
+      SHMTU_LOG_FILE: ${SHMTU_LOG_FILE:-/app/logs/shmtu-cas-ocr-server.log}
       SHMTU_HTTP_PORT: 21600
       SHMTU_TCP_PORT: 21601
       SHMTU_USE_GPU: ${SHMTU_USE_GPU:-1}

@@ -6,11 +6,9 @@ ARG USE_CHSRC=0
 ARG CHSRC_DEB_URL=https://gitee.com/RubyMetric/chsrc/releases/download/pre/chsrc_latest-1_amd64.deb
 
 RUN apt-get update \
-    && apt-get upgrade -y \
     && apt-get install -y --no-install-recommends \
         ca-certificates \
         curl \
-        python3 \
     && rm -rf /var/lib/apt/lists/*
 
 RUN if [ "${USE_CHSRC}" = "1" ]; then \
@@ -28,8 +26,10 @@ RUN apt-get update \
         ninja-build \
         pkg-config \
         unzip \
+        python3 \
+        libcli11-dev \
         libopencv-dev \
-        libfmt-dev \
+        libgoogle-glog-dev \
         libdrogon-dev \
         libtrantor-dev \
         libjsoncpp-dev \
