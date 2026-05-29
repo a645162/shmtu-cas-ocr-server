@@ -2,6 +2,8 @@
 
 ShangHai Maritime University CAS OCR Server
 
+[![Publish System Docker Images](https://github.com/a645162/shmtu-cas-ocr-server/actions/workflows/build-system-vulkan.yml/badge.svg)](https://github.com/a645162/shmtu-cas-ocr-server/actions/workflows/build-system-vulkan.yml)
+
 ## 模型权重
 
 请前往[shmtu-cas-ocr-model](https://github.com/a645162/shmtu-cas-ocr-model)项目的[Github Release](https://github.com/a645162/shmtu-cas-ocr-model/releases)中下载NCNN版权重。
