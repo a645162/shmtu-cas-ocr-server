@@ -7,7 +7,7 @@ PROJECT_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 
 USE_CHSRC="${USE_CHSRC:-0}"
 BUILDER_IMAGE="${BUILDER_IMAGE:-shmtu-cas-ocr-builder:system-vulkan}"
-RUNTIME_IMAGE="${RUNTIME_IMAGE:-shmtu-cas-ocr-server:system-vulkan}"
+RUNTIME_IMAGE="${RUNTIME_IMAGE:-shmtu-cas-ocr-server:vulkan}"
 NCNN_FORCE="${NCNN_FORCE:-0}"
 HOST_UID="$(id -u)"
 HOST_GID="$(id -g)"

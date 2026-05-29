@@ -15,6 +15,11 @@ set(SERVER_SOURCES
 
 add_executable(shmtu_cas_ocr_server ${SERVER_SOURCES})
 
+shmtu_apply_target_version(
+    shmtu_cas_ocr_server
+    "${SHMTU_CAS_SERVER_VERSION}"
+)
+
 target_include_directories(shmtu_cas_ocr_server
     PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/include

@@ -61,6 +61,7 @@ void OcrWorkerPool::add_worker(std::unique_ptr<CasOcr> ocr) {
 }
 
 void OcrWorkerPool::start() {
+    accepting.store(true);
     for (const auto i : std::views::iota(size_t{0}, workers.size())) {
         threads.emplace_back([this, idx = i](std::stop_token stop_token) {
             while (!stop_token.stop_requested()) {
@@ -80,7 +81,11 @@ void OcrWorkerPool::start() {
                 }
 
                 active_workers.fetch_add(1);
-                task(*workers[idx]);
+                try {
+                    task(*workers[idx]);
+                } catch (...) {
+                    // Keep the worker alive even if a completion callback throws.
+                }
                 active_workers.fetch_sub(1);
             }
         });
@@ -90,6 +95,9 @@ void OcrWorkerPool::start() {
 bool OcrWorkerPool::submit(std::function<void(CasOcr&)> task, int max_queue) {
     {
         std::lock_guard<std::mutex> lock(queue_mutex);
+        if (!accepting.load()) {
+            return false;
+        }
         if (static_cast<int>(task_queue.size()) >= max_queue) {
             return false;
         }
@@ -102,6 +110,7 @@ bool OcrWorkerPool::submit(std::function<void(CasOcr&)> task, int max_queue) {
 }
 
 void OcrWorkerPool::stop_all() {
+    accepting.store(false);
     for (auto& thread : threads) {
         thread.request_stop();
     }
@@ -118,42 +127,22 @@ OcrServer::Impl::Impl(const ServerConfig& cfg)
     : config(cfg) {
 }
 
-PredictResult OcrServer::Impl::predict_sync(
+bool OcrServer::Impl::submit_predict(
     std::span<const uint8_t> image_bytes,
-    bool& queued_ok) {
-    return predict_sync(std::vector<uint8_t>(image_bytes.begin(), image_bytes.end()), queued_ok);
+    std::function<void(PredictResult)> on_complete) {
+    return submit_predict(
+        std::vector<uint8_t>(image_bytes.begin(), image_bytes.end()),
+        std::move(on_complete));
 }
 
-PredictResult OcrServer::Impl::predict_sync(
+bool OcrServer::Impl::submit_predict(
     std::vector<uint8_t> image_bytes,
-    bool& queued_ok) {
-    PredictResult result;
-    std::mutex result_mutex;
-    std::condition_variable result_cv;
-    bool done = false;
-
-    queued_ok = pool->submit([&, image_bytes = std::move(image_bytes)](CasOcr& ocr) {
-        result = ocr.predict(std::span<const uint8_t>(image_bytes));
-        {
-            std::lock_guard<std::mutex> lock(result_mutex);
-            done = true;
-        }
-        result_cv.notify_one();
-    }, config.queue_capacity);
-
-    if (!queued_ok) {
-        result.success = false;
-        result.error = "Server overloaded";
-        return result;
-    }
-
-    std::unique_lock<std::mutex> lock(result_mutex);
-    if (!result_cv.wait_for(lock, std::chrono::seconds(30), [&] { return done; })) {
-        result.success = false;
-        result.error = "Prediction timeout";
-    }
-
-    return result;
+    std::function<void(PredictResult)> on_complete) {
+    return pool->submit(
+        [image_bytes = std::move(image_bytes), on_complete = std::move(on_complete)](CasOcr& ocr) mutable {
+            on_complete(ocr.predict(std::span<const uint8_t>(image_bytes)));
+        },
+        config.queue_capacity);
 }
 
 } // namespace shmtu::cas::ocr

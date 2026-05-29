@@ -23,6 +23,7 @@ python3 ./scripts/run_server.py
 python3 ./scripts/run_server.py --workers 4 --queue-capacity 32
 SHMTU_HTTP_PORT=3000 SHMTU_TCP_PORT=3001 python3 ./scripts/run_server.py
 SHMTU_USE_GPU=0 python3 ./scripts/run_server.py
+SHMTU_WORKERS=0 SHMTU_NCNN_THREADS=0 SHMTU_QUEUE_CAPACITY=0 python3 ./scripts/run_server.py
 ```
 
 ### `run_cli.py`
@@ -102,6 +103,18 @@ SHMTU_BUILD_PRESET=build-linux-vcpkg python3 ./scripts/run_lib_check.py
   - HTTP 监听端口。
 - `SHMTU_TCP_PORT`
   - TCP 监听端口。
+- `SHMTU_WORKERS`
+  - OCR worker 数量。`0` 表示按 CPU 核心和运行模式自动调节。
+- `SHMTU_QUEUE_CAPACITY`
+  - 最大排队请求数。`0` 表示按 worker 数自动调节。
+- `SHMTU_NCNN_THREADS`
+  - 每个 worker 的 NCNN CPU 线程数。`0` 表示自动调节。
+- `SHMTU_HTTP_HOST`
+  - HTTP 监听地址。
+- `SHMTU_TCP_HOST`
+  - TCP 监听地址。
+- `SHMTU_SERVER_NAME`
+  - 在 `/api/health` 和 `/api/status` 中附加 `serverName`。
 
 ### 仅 `run_lib_check.py`
 

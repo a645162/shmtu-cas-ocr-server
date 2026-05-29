@@ -46,6 +46,7 @@ struct OcrWorkerPool {
     std::mutex queue_mutex;
     std::queue<std::function<void(CasOcr&)>> task_queue;
     std::vector<std::jthread> threads;
+    std::atomic<bool> accepting{true};
     std::atomic<int> active_workers{0};
     std::atomic<int> pending_tasks{0};
 
@@ -58,8 +59,10 @@ struct OcrWorkerPool {
 struct OcrServer::Impl {
     explicit Impl(const ServerConfig& cfg);
 
-    PredictResult predict_sync(std::span<const uint8_t> image_bytes, bool& queued_ok);
-    PredictResult predict_sync(std::vector<uint8_t> image_bytes, bool& queued_ok);
+    bool submit_predict(std::span<const uint8_t> image_bytes,
+                        std::function<void(PredictResult)> on_complete);
+    bool submit_predict(std::vector<uint8_t> image_bytes,
+                        std::function<void(PredictResult)> on_complete);
 
     ServerConfig config;
     std::unique_ptr<OcrWorkerPool> pool;

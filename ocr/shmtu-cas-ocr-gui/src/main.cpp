@@ -1,6 +1,7 @@
 #include <shmtu/cas_ocr/gui/launch_options.h>
 #include <shmtu/cas_ocr/gui/logging.h>
 #include <shmtu/cas_ocr/gui/main_window.h>
+#include <shmtu/cas_ocr/version.h>
 
 #include <curl/curl.h>
 
@@ -20,7 +21,7 @@ int main(int argc, char* argv[]) {
 
     QApplication app(argc, argv);
     app.setApplicationName(QStringLiteral("SHMTU CAS OCR"));
-    app.setApplicationVersion(QStringLiteral("2.0.0"));
+    app.setApplicationVersion(QString::fromUtf8(SHMTU_CAS_OCR_GUI_VERSION));
 
     QCommandLineParser parser;
     parser.setApplicationDescription(QString::fromUtf8("SHMTU CAS OCR GUI"));

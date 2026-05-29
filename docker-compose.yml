@@ -1,55 +1,32 @@
 version: "3.8"
 
 services:
-  # ------------------------------------------------------------------
-  # CPU-only build (default)
-  # ------------------------------------------------------------------
   shmtu-cas-ocr-server:
-    build:
-      context: .
-      target: runtime-cpu
-      args:
-        BUILD_TARGET: cpu
-    image: shmtu-cas-ocr-server:cpu
+    image: ${SHMTU_RUNTIME_IMAGE:-a645162/shmtu-cas-ocr-server:latest}
     container_name: shmtu-cas-ocr-server
+    restart: unless-stopped
     ports:
-      - "21600:21600"  # HTTP RESTful API
-      - "21601:21601"  # TCP legacy protocol
+      - "21600:21600"
+      - "21601:21601"
     volumes:
       - ./models:/app/models:ro
     environment:
-      - LD_LIBRARY_PATH=/usr/local/lib
-    restart: unless-stopped
+      SHMTU_MODEL_DIR: /app/models
+      SHMTU_HTTP_PORT: 21600
+      SHMTU_TCP_PORT: 21601
+      SHMTU_USE_GPU: ${SHMTU_USE_GPU:-1}
+      SHMTU_WORKERS: ${SHMTU_WORKERS:-0}
+      SHMTU_QUEUE_CAPACITY: ${SHMTU_QUEUE_CAPACITY:-0}
+      SHMTU_NCNN_THREADS: ${SHMTU_NCNN_THREADS:-0}
+      SHMTU_SERVER_NAME: ${SHMTU_SERVER_NAME:-}
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:21600/api/health"]
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:21600/api/health"]
       interval: 30s
       timeout: 5s
       retries: 3
       start_period: 10s
-
-  # ------------------------------------------------------------------
-  # GPU-enabled build (Intel / Mesa Vulkan via /dev/dri passthrough)
-  # Uncomment and use this instead of the CPU service above.
-  # ------------------------------------------------------------------
-  # shmtu-cas-ocr-server-gpu:
-  #   build:
-  #     context: .
-  #     target: runtime-gpu
-  #   image: shmtu-cas-ocr-server:gpu
-  #   container_name: shmtu-cas-ocr-server-gpu
-  #   ports:
-  #     - "21600:21600"
-  #     - "21601:21601"
-  #   volumes:
-  #     - ./models:/app/models:ro
-  #   devices:
-  #     - /dev/dri:/dev/dri
-  #   environment:
-  #     - LD_LIBRARY_PATH=/opt/shmtu/lib
-  #   restart: unless-stopped
-  #   healthcheck:
-  #     test: ["CMD", "curl", "-f", "http://localhost:21600/api/health"]
-  #     interval: 30s
-  #     timeout: 5s
-  #     retries: 3
-  #     start_period: 10s
+    # GPU runtime:
+    # 1. 保持 SHMTU_USE_GPU=1
+    # 2. 如果宿主使用 Mesa/Intel/AMD Vulkan，取消下面 devices 注释
+    # devices:
+    #   - /dev/dri:/dev/dri

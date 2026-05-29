@@ -1,6 +1,7 @@
 #include <shmtu/cas_ocr/gui/main_window.h>
 
 #include <shmtu/cas_ocr/cas_ocr.h>
+#include <shmtu/cas_ocr/version.h>
 #include <shmtu/cas_ocr/gui/image_view.h>
 #include <shmtu/cas_ocr/gui/launch_options.h>
 #include <shmtu/cas_ocr/gui/logging.h>
@@ -765,7 +766,7 @@ void MainWindow::onAbout() {
     QMessageBox::about(
         this,
         qs("关于"),
-        qs("海大验证码识别 - NCNN\n版本：") + QStringLiteral("2.0.0") + qs(
+        qs("海大验证码识别 - NCNN\n版本：") + QString::fromUtf8(SHMTU_CAS_OCR_GUI_VERSION) + qs(
             "\n\n上海海事大学 CAS 验证码 OCR 识别工具\n基于 NCNN 推理引擎，支持 CPU / Vulkan GPU 加速"));
 }
 

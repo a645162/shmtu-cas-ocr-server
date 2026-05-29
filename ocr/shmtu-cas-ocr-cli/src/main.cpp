@@ -1,6 +1,7 @@
 // SHMTU CAS OCR CLI — local/remote/compare modes with C++23-style plumbing
 
 #include <shmtu/cas_ocr/cas_ocr.h>
+#include <shmtu/cas_ocr/version.h>
 
 #include <httplib.h>
 
@@ -22,10 +23,6 @@
 #include <vector>
 
 namespace fs = std::filesystem;
-
-#ifndef SHMTU_CAS_CLI_VERSION
-#define SHMTU_CAS_CLI_VERSION "2.2.0"
-#endif
 
 namespace {
 
@@ -90,7 +87,7 @@ std::expected<std::pair<std::string, int>, std::string> parse_server_endpoint(
 }
 
 void print_banner() {
-    std::printf("SHMTU CAS OCR CLI V%s\n", SHMTU_CAS_CLI_VERSION);
+    std::printf("SHMTU CAS OCR CLI V%s\n", SHMTU_CAS_OCR_CLI_VERSION);
 }
 
 void print_usage(const char* prog) {

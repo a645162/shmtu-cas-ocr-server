@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <expected>
+#include <memory>
 #include <string_view>
 #include <vector>
 
@@ -30,32 +31,17 @@ std::expected<std::vector<uint8_t>, std::string> decode_image_base64(
         return std::unexpected("ImageBase64 is required");
     }
 
-    return base64_decode(json_body["imageBase64"].asString());
+    auto decoded = base64_decode(json_body["imageBase64"].asString());
+    if (!decoded) {
+        return std::unexpected("Invalid base64 string");
+    }
+    return decoded;
 }
 
 void handle_predict_result(
     OcrServer::Impl& impl,
     const PredictResult& result,
-    bool queued_ok,
-    ResponseCallback&& callback) {
-    if (!queued_ok) {
-        Json::Value body(Json::objectValue);
-        body["success"] = false;
-        body["error"] = "Server overloaded";
-        impl.failed_requests.fetch_add(1);
-        callback(make_json_response(body, drogon::k503ServiceUnavailable));
-        return;
-    }
-
-    if (!result.success && result.error == "Prediction timeout") {
-        Json::Value body(Json::objectValue);
-        body["success"] = false;
-        body["error"] = result.error;
-        impl.failed_requests.fetch_add(1);
-        callback(make_json_response(body, drogon::k504GatewayTimeout));
-        return;
-    }
-
+    ResponseCallback callback) {
     if (result.success) {
         impl.successful_requests.fetch_add(1);
     } else {
@@ -91,12 +77,11 @@ Json::Value predict_result_to_json(const PredictResult& result) {
 Json::Value health_to_json(const HealthResult& health) {
     Json::Value json(Json::objectValue);
     json["status"] = health.status;
-    json["availabilityLevel"] = health.availability_level;
-    json["reason"] = health.reason;
     json["modelsLoaded"] = health.models_loaded;
     json["poolSize"] = health.pool_size;
-    json["queueCapacity"] = health.queue_capacity;
-    json["pendingRequests"] = health.pending_requests;
+    if (!health.server_name.empty()) {
+        json["serverName"] = health.server_name;
+    }
     return json;
 }
 
@@ -120,6 +105,9 @@ Json::Value stats_to_json(const ServerStats& stats) {
     json["successCount"] = stats.successful_requests;
     json["failureCount"] = stats.failed_requests;
     json["uptimeSeconds"] = static_cast<Json::Int64>(uptime_secs);
+    if (!stats.server_name.empty()) {
+        json["serverName"] = stats.server_name;
+    }
     return json;
 }
 
@@ -162,9 +150,18 @@ void register_http_handlers(OcrServer::Impl& impl, OcrServer& server) {
                 return;
             }
 
-            bool queued_ok = false;
-            auto result = impl.predict_sync(std::move(*image_bytes), queued_ok);
-            handle_predict_result(impl, result, queued_ok, std::move(callback));
+            auto callback_holder = std::make_shared<ResponseCallback>(std::move(callback));
+            if (!impl.submit_predict(
+                    std::move(*image_bytes),
+                    [&impl, callback_holder](PredictResult result) {
+                        handle_predict_result(impl, result, *callback_holder);
+                    })) {
+                Json::Value body(Json::objectValue);
+                body["success"] = false;
+                body["error"] = "Server overloaded";
+                impl.failed_requests.fetch_add(1);
+                (*callback_holder)(make_json_response(body, drogon::k503ServiceUnavailable));
+            }
         },
         {drogon::Post});
 
@@ -191,9 +188,18 @@ void register_http_handlers(OcrServer::Impl& impl, OcrServer& server) {
                 file.fileData(),
                 file.fileData() + file.fileLength());
 
-            bool queued_ok = false;
-            auto result = impl.predict_sync(std::move(image_bytes), queued_ok);
-            handle_predict_result(impl, result, queued_ok, std::move(callback));
+            auto callback_holder = std::make_shared<ResponseCallback>(std::move(callback));
+            if (!impl.submit_predict(
+                    std::move(image_bytes),
+                    [&impl, callback_holder](PredictResult result) {
+                        handle_predict_result(impl, result, *callback_holder);
+                    })) {
+                Json::Value body(Json::objectValue);
+                body["success"] = false;
+                body["error"] = "Server overloaded";
+                impl.failed_requests.fetch_add(1);
+                (*callback_holder)(make_json_response(body, drogon::k503ServiceUnavailable));
+            }
         },
         {drogon::Post});
 }

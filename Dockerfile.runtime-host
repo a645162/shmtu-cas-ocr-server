@@ -2,6 +2,13 @@ FROM ubuntu:24.04
 
 ENV DEBIAN_FRONTEND=noninteractive
 ENV LD_LIBRARY_PATH=/lib/x86_64-linux-gnu:/usr/lib/x86_64-linux-gnu
+ENV SHMTU_MODEL_DIR=/app/models
+ENV SHMTU_HTTP_PORT=21600
+ENV SHMTU_TCP_PORT=21601
+ENV SHMTU_USE_GPU=1
+ENV SHMTU_WORKERS=0
+ENV SHMTU_QUEUE_CAPACITY=0
+ENV SHMTU_NCNN_THREADS=0
 
 WORKDIR /app
 
@@ -12,4 +19,3 @@ EXPOSE 21600
 EXPOSE 21601
 
 ENTRYPOINT ["/opt/shmtu/bin/shmtu_cas_ocr_server"]
-CMD ["--model-dir", "/app/models", "--http-port", "21600", "--tcp-port", "21601", "--use-gpu"]

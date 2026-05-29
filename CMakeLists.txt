@@ -1,10 +1,25 @@
 cmake_minimum_required(VERSION 3.20)
 message(STATUS "CMake version: ${CMAKE_VERSION}")
 
+file(STRINGS "${CMAKE_SOURCE_DIR}/VERSION" SHMTU_CAS_VERSION LIMIT_COUNT 1
+    REGEX "^[0-9]+\\.[0-9]+\\.[0-9]+$")
+if(NOT SHMTU_CAS_VERSION)
+    message(FATAL_ERROR "Failed to read semantic version from ${CMAKE_SOURCE_DIR}/VERSION")
+endif()
+
 # --------------------------------------------------------------------------
 # Project
 # --------------------------------------------------------------------------
-project(shmtu-cas-cpp VERSION 1.0.0 LANGUAGES CXX)
+project(shmtu-cas-cpp VERSION ${SHMTU_CAS_VERSION} LANGUAGES CXX)
+
+set(SHMTU_CAS_LIB_VERSION    "${PROJECT_VERSION}")
+set(SHMTU_CAS_SERVER_VERSION "${PROJECT_VERSION}")
+set(SHMTU_CAS_CLI_VERSION    "${PROJECT_VERSION}")
+set(SHMTU_CAS_GUI_VERSION    "${PROJECT_VERSION}")
+set(SHMTU_CAS_LIB_SOVERSION  "${PROJECT_VERSION_MAJOR}")
+
+list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake")
+include(ShmtuVersion)
 
 # --------------------------------------------------------------------------
 # Options
@@ -37,9 +52,11 @@ set_property(GLOBAL PROPERTY USE_FOLDERS ON)
 # --------------------------------------------------------------------------
 # Version definition
 # --------------------------------------------------------------------------
-add_definitions(-DSHMTU_CAS_SERVER_VERSION="${PROJECT_VERSION}")
-
 message(STATUS "SHMTU_CAS_OCR version: ${PROJECT_VERSION}")
+message(STATUS "  lib:    ${SHMTU_CAS_LIB_VERSION}")
+message(STATUS "  server: ${SHMTU_CAS_SERVER_VERSION}")
+message(STATUS "  cli:    ${SHMTU_CAS_CLI_VERSION}")
+message(STATUS "  gui:    ${SHMTU_CAS_GUI_VERSION}")
 message(STATUS "System: ${CMAKE_SYSTEM_NAME}")
 message(STATUS "C++ standard: C++${CMAKE_CXX_STANDARD}")
 message(STATUS "Build shared libraries: ${BUILD_SHARED_LIBS}")

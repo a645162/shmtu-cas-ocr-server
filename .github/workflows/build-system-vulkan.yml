@@ -1,4 +1,4 @@
-name: Build System Vulkan
+name: Publish System Docker Images
 
 on:
   workflow_dispatch:
@@ -6,14 +6,110 @@ on:
     branches:
       - main
       - master
+    paths:
+      - ".github/workflows/build-system-vulkan.yml"
+      - "CMakeLists.txt"
+      - "VERSION"
+      - "CMakePresets.json"
+      - "cmake/ShmtuVersion.cmake"
+      - "Dockerfile.builder-system"
+      - "Dockerfile.runtime-system-cpu"
+      - "Dockerfile.runtime-system-vulkan"
+      - "scripts/docker_build_system.sh"
+      - "scripts/docker_build_system_vulkan.sh"
+      - "scripts/ci_build_system_vulkan.sh"
+      - "3rdparty/NCNN/**"
+      - "ocr/**"
   pull_request:
+    paths:
+      - ".github/workflows/build-system-vulkan.yml"
+      - "CMakeLists.txt"
+      - "VERSION"
+      - "CMakePresets.json"
+      - "cmake/ShmtuVersion.cmake"
+      - "Dockerfile.builder-system"
+      - "Dockerfile.runtime-system-cpu"
+      - "Dockerfile.runtime-system-vulkan"
+      - "scripts/docker_build_system.sh"
+      - "scripts/docker_build_system_vulkan.sh"
+      - "scripts/ci_build_system_vulkan.sh"
+      - "3rdparty/NCNN/**"
+      - "ocr/**"
+
+permissions:
+  contents: read
+  packages: write
+
+env:
+  DOCKER_HUB_REPO: a645162/shmtu-cas-ocr-server
+  ALIYUN_ACR_REGION: cn-shanghai
 
 jobs:
-  ubuntu-2404-system-vulkan:
+  prepare-environment:
     runs-on: ubuntu-24.04
-
+    outputs:
+      suite-version: ${{ steps.set-version.outputs.suite-version }}
+      server-version: ${{ steps.set-version.outputs.server-version }}
+      version-major: ${{ steps.set-version.outputs.version-major }}
+      version-minor: ${{ steps.set-version.outputs.version-minor }}
+      acr-registry: ${{ steps.set-acr.outputs.acr-registry }}
     steps:
-      - name: Checkout
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      - name: Resolve release versions
+        id: set-version
+        run: |
+          SUITE_VERSION="$(tr -d '\n\r' < VERSION)"
+          if ! [[ "${SUITE_VERSION}" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "Invalid semantic version in VERSION: ${SUITE_VERSION}" >&2
+            exit 1
+          fi
+          IFS='.' read -r VERSION_MAJOR VERSION_MINOR VERSION_PATCH <<< "${SUITE_VERSION}"
+          SERVER_VERSION="${SUITE_VERSION}"
+          echo "suite-version=${SUITE_VERSION}" >> "${GITHUB_OUTPUT}"
+          echo "server-version=${SERVER_VERSION}" >> "${GITHUB_OUTPUT}"
+          echo "version-major=${VERSION_MAJOR}" >> "${GITHUB_OUTPUT}"
+          echo "version-minor=${VERSION_MAJOR}.${VERSION_MINOR}" >> "${GITHUB_OUTPUT}"
+          echo "SUITE_VERSION=${SUITE_VERSION}" >> "${GITHUB_ENV}"
+          echo "SERVER_VERSION=${SERVER_VERSION}" >> "${GITHUB_ENV}"
+          echo "VERSION_MAJOR=${VERSION_MAJOR}" >> "${GITHUB_ENV}"
+          echo "VERSION_MINOR=${VERSION_MAJOR}.${VERSION_MINOR}" >> "${GITHUB_ENV}"
+
+      - name: Print release versions
+        run: |
+          echo "Suite version:  '${{ env.SUITE_VERSION }}'"
+          echo "Server version: '${{ env.SERVER_VERSION }}'"
+
+      - name: Configure Aliyun ACR region
+        id: set-acr
+        run: |
+          echo "acr-registry=registry.${ALIYUN_ACR_REGION}.aliyuncs.com" >> "${GITHUB_OUTPUT}"
+          echo "ACR_REGISTRY=registry.${ALIYUN_ACR_REGION}.aliyuncs.com" >> "${GITHUB_ENV}"
+
+      - name: Verify Aliyun ACR settings
+        run: |
+          echo "Aliyun ACR REGION=${{ env.ALIYUN_ACR_REGION }}"
+          echo "Aliyun ACR REGISTRY=${{ env.ACR_REGISTRY }}"
+
+  build-runtime-image:
+    runs-on: ubuntu-24.04
+    needs: prepare-environment
+    strategy:
+      matrix:
+        include:
+          - variant: cpu
+            local_image: shmtu-cas-ocr-server:system-cpu
+            artifact_name: ubuntu-2404-system-cpu-artifacts
+            build_dir: build/linux-system
+            archive_name: shmtu-cas-ocr-server-system-cpu.tar
+          - variant: vulkan
+            local_image: shmtu-cas-ocr-server:system-vulkan
+            artifact_name: ubuntu-2404-system-vulkan-artifacts
+            build_dir: build/linux-system-vulkan
+            archive_name: shmtu-cas-ocr-server-system-vulkan.tar
+    steps:
+      - name: Checkout source
         uses: actions/checkout@v4
 
       - name: Install host tools
@@ -24,23 +120,254 @@ jobs:
             python3 \
             ca-certificates
 
-      - name: Build server, CLI and runtime image via Docker
+      - name: Export program version
         run: |
-          chmod +x scripts/docker_build_system_vulkan.sh
-          chmod +x scripts/ci_build_system_vulkan.sh
-          ./scripts/ci_build_system_vulkan.sh
+          echo "SUITE_VERSION=${{ needs.prepare-environment.outputs.suite-version }}" >> "${GITHUB_ENV}"
+          echo "SERVER_VERSION=${{ needs.prepare-environment.outputs.server-version }}" >> "${GITHUB_ENV}"
+
+      - name: Build inside Docker and create runtime image
+        run: |
+          chmod +x scripts/docker_build_system.sh
+          ./scripts/docker_build_system.sh "${{ matrix.variant }}"
 
       - name: Export runtime image
         run: |
-          docker save shmtu-cas-ocr-server:system-vulkan -o shmtu-cas-ocr-server-system-vulkan.tar
+          docker save "${{ matrix.local_image }}" -o "${{ matrix.archive_name }}"
 
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: ubuntu-2404-system-vulkan-artifacts
+          name: ${{ matrix.artifact_name }}
           path: |
-            build/linux-system-vulkan/ocr/shmtu-cas-ocr-server/shmtu_cas_ocr_server
-            build/linux-system-vulkan/ocr/shmtu-cas-ocr-cli/shmtu_cas_ocr_cli
+            ${{ matrix.build_dir }}/ocr/shmtu-cas-ocr-server/shmtu_cas_ocr_server
+            ${{ matrix.build_dir }}/ocr/shmtu-cas-ocr-cli/shmtu_cas_ocr_cli
             docker-runtime/shmtu_cas_ocr_server
             docker-runtime/shmtu_cas_ocr_cli
-            shmtu-cas-ocr-server-system-vulkan.tar
+            ${{ matrix.archive_name }}
+
+  push-ghcr:
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-24.04
+    needs:
+      - prepare-environment
+      - build-runtime-image
+    strategy:
+      matrix:
+        include:
+          - variant: cpu
+            local_image: shmtu-cas-ocr-server:system-cpu
+            artifact_name: ubuntu-2404-system-cpu-artifacts
+            archive_name: shmtu-cas-ocr-server-system-cpu.tar
+            tag_suffix: cpu
+            publish_bare: "false"
+            publish_vulkan_alias: "false"
+          - variant: vulkan
+            local_image: shmtu-cas-ocr-server:system-vulkan
+            artifact_name: ubuntu-2404-system-vulkan-artifacts
+            archive_name: shmtu-cas-ocr-server-system-vulkan.tar
+            tag_suffix: vulkan
+            publish_bare: "true"
+            publish_vulkan_alias: "true"
+    steps:
+      - name: Export release versions
+        run: |
+          echo "SERVER_VERSION=${{ needs.prepare-environment.outputs.server-version }}" >> "${GITHUB_ENV}"
+          echo "VERSION_MAJOR=${{ needs.prepare-environment.outputs.version-major }}" >> "${GITHUB_ENV}"
+          echo "VERSION_MINOR=${{ needs.prepare-environment.outputs.version-minor }}" >> "${GITHUB_ENV}"
+
+      - name: Download runtime image artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ matrix.artifact_name }}
+          path: ./artifact
+
+      - name: Load runtime image
+        run: |
+          docker load -i "./artifact/${{ matrix.archive_name }}"
+
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Tag and push to GHCR
+        run: |
+          IMAGE_BASE="ghcr.io/${{ github.repository }}"
+          TAGS=()
+          if [ "${{ matrix.publish_bare }}" = "true" ]; then
+            TAGS+=(
+              "${SERVER_VERSION}"
+              "${VERSION_MINOR}"
+              "${VERSION_MAJOR}"
+              "latest"
+            )
+          fi
+          if [ "${{ matrix.publish_vulkan_alias }}" = "true" ]; then
+            TAGS+=(
+              "${SERVER_VERSION}-${{ matrix.tag_suffix }}"
+              "${VERSION_MINOR}-${{ matrix.tag_suffix }}"
+              "${VERSION_MAJOR}-${{ matrix.tag_suffix }}"
+              "latest-${{ matrix.tag_suffix }}"
+            )
+          else
+            TAGS+=(
+              "${SERVER_VERSION}-${{ matrix.tag_suffix }}"
+              "${VERSION_MINOR}-${{ matrix.tag_suffix }}"
+              "${VERSION_MAJOR}-${{ matrix.tag_suffix }}"
+              "latest-${{ matrix.tag_suffix }}"
+            )
+          fi
+          for tag in "${TAGS[@]}"; do
+            docker tag "${{ matrix.local_image }}" "${IMAGE_BASE}:${tag}"
+            docker push "${IMAGE_BASE}:${tag}"
+          done
+
+  push-dockerhub:
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-24.04
+    needs:
+      - prepare-environment
+      - push-ghcr
+    strategy:
+      matrix:
+        include:
+          - variant: cpu
+            tag_suffix: cpu
+            publish_bare: "false"
+            publish_vulkan_alias: "false"
+          - variant: vulkan
+            tag_suffix: vulkan
+            publish_bare: "true"
+            publish_vulkan_alias: "true"
+    steps:
+      - name: Export release versions
+        run: |
+          echo "SERVER_VERSION=${{ needs.prepare-environment.outputs.server-version }}" >> "${GITHUB_ENV}"
+          echo "VERSION_MAJOR=${{ needs.prepare-environment.outputs.version-major }}" >> "${GITHUB_ENV}"
+          echo "VERSION_MINOR=${{ needs.prepare-environment.outputs.version-minor }}" >> "${GITHUB_ENV}"
+
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKER_HUB_USERNAME }}
+          password: ${{ secrets.DOCKER_HUB_PASSWORD }}
+
+      - name: Setup Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Copy image from GHCR to Docker Hub
+        run: |
+          if [ "${{ matrix.publish_bare }}" = "true" ]; then
+            IMAGE_REF="ghcr.io/${{ github.repository }}:${{ env.SERVER_VERSION }}"
+          else
+            IMAGE_REF="ghcr.io/${{ github.repository }}:${{ env.SERVER_VERSION }}-${{ matrix.tag_suffix }}"
+          fi
+          TAG_ARGS=()
+          if [ "${{ matrix.publish_bare }}" = "true" ]; then
+            TAG_ARGS+=(
+              --tag "${{ env.DOCKER_HUB_REPO }}:${{ env.SERVER_VERSION }}"
+              --tag "${{ env.DOCKER_HUB_REPO }}:${{ env.VERSION_MINOR }}"
+              --tag "${{ env.DOCKER_HUB_REPO }}:${{ env.VERSION_MAJOR }}"
+              --tag "${{ env.DOCKER_HUB_REPO }}:latest"
+            )
+          fi
+          if [ "${{ matrix.publish_vulkan_alias }}" = "true" ]; then
+            TAG_ARGS+=(
+              --tag "${{ env.DOCKER_HUB_REPO }}:${{ env.SERVER_VERSION }}-${{ matrix.tag_suffix }}"
+              --tag "${{ env.DOCKER_HUB_REPO }}:${{ env.VERSION_MINOR }}-${{ matrix.tag_suffix }}"
+              --tag "${{ env.DOCKER_HUB_REPO }}:${{ env.VERSION_MAJOR }}-${{ matrix.tag_suffix }}"
+              --tag "${{ env.DOCKER_HUB_REPO }}:latest-${{ matrix.tag_suffix }}"
+            )
+          else
+            TAG_ARGS+=(
+              --tag "${{ env.DOCKER_HUB_REPO }}:${{ env.SERVER_VERSION }}-${{ matrix.tag_suffix }}"
+              --tag "${{ env.DOCKER_HUB_REPO }}:${{ env.VERSION_MINOR }}-${{ matrix.tag_suffix }}"
+              --tag "${{ env.DOCKER_HUB_REPO }}:${{ env.VERSION_MAJOR }}-${{ matrix.tag_suffix }}"
+              --tag "${{ env.DOCKER_HUB_REPO }}:latest-${{ matrix.tag_suffix }}"
+            )
+          fi
+          docker buildx imagetools create "${TAG_ARGS[@]}" "${IMAGE_REF}"
+
+  push-aliyun:
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-24.04
+    needs:
+      - prepare-environment
+      - push-ghcr
+    strategy:
+      matrix:
+        include:
+          - variant: cpu
+            tag_suffix: cpu
+            publish_bare: "false"
+            publish_vulkan_alias: "false"
+          - variant: vulkan
+            tag_suffix: vulkan
+            publish_bare: "true"
+            publish_vulkan_alias: "true"
+    steps:
+      - name: Export release versions
+        run: |
+          echo "SERVER_VERSION=${{ needs.prepare-environment.outputs.server-version }}" >> "${GITHUB_ENV}"
+          echo "VERSION_MAJOR=${{ needs.prepare-environment.outputs.version-major }}" >> "${GITHUB_ENV}"
+          echo "VERSION_MINOR=${{ needs.prepare-environment.outputs.version-minor }}" >> "${GITHUB_ENV}"
+          echo "ACR_REGISTRY=${{ needs.prepare-environment.outputs.acr-registry }}" >> "${GITHUB_ENV}"
+
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Login to Aliyun ACR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.ACR_REGISTRY }}
+          username: ${{ secrets.ALIYUN_USERNAME }}
+          password: ${{ secrets.ALIYUN_PASSWORD }}
+
+      - name: Setup Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Copy image from GHCR to Aliyun ACR
+        run: |
+          if [ "${{ matrix.publish_bare }}" = "true" ]; then
+            IMAGE_REF="ghcr.io/${{ github.repository }}:${{ env.SERVER_VERSION }}"
+          else
+            IMAGE_REF="ghcr.io/${{ github.repository }}:${{ env.SERVER_VERSION }}-${{ matrix.tag_suffix }}"
+          fi
+          TAG_ARGS=()
+          if [ "${{ matrix.publish_bare }}" = "true" ]; then
+            TAG_ARGS+=(
+              --tag "${{ env.ACR_REGISTRY }}/${{ env.DOCKER_HUB_REPO }}:${{ env.SERVER_VERSION }}"
+              --tag "${{ env.ACR_REGISTRY }}/${{ env.DOCKER_HUB_REPO }}:${{ env.VERSION_MINOR }}"
+              --tag "${{ env.ACR_REGISTRY }}/${{ env.DOCKER_HUB_REPO }}:${{ env.VERSION_MAJOR }}"
+              --tag "${{ env.ACR_REGISTRY }}/${{ env.DOCKER_HUB_REPO }}:latest"
+            )
+          fi
+          if [ "${{ matrix.publish_vulkan_alias }}" = "true" ]; then
+            TAG_ARGS+=(
+              --tag "${{ env.ACR_REGISTRY }}/${{ env.DOCKER_HUB_REPO }}:${{ env.SERVER_VERSION }}-${{ matrix.tag_suffix }}"
+              --tag "${{ env.ACR_REGISTRY }}/${{ env.DOCKER_HUB_REPO }}:${{ env.VERSION_MINOR }}-${{ matrix.tag_suffix }}"
+              --tag "${{ env.ACR_REGISTRY }}/${{ env.DOCKER_HUB_REPO }}:${{ env.VERSION_MAJOR }}-${{ matrix.tag_suffix }}"
+              --tag "${{ env.ACR_REGISTRY }}/${{ env.DOCKER_HUB_REPO }}:latest-${{ matrix.tag_suffix }}"
+            )
+          else
+            TAG_ARGS+=(
+              --tag "${{ env.ACR_REGISTRY }}/${{ env.DOCKER_HUB_REPO }}:${{ env.SERVER_VERSION }}-${{ matrix.tag_suffix }}"
+              --tag "${{ env.ACR_REGISTRY }}/${{ env.DOCKER_HUB_REPO }}:${{ env.VERSION_MINOR }}-${{ matrix.tag_suffix }}"
+              --tag "${{ env.ACR_REGISTRY }}/${{ env.DOCKER_HUB_REPO }}:${{ env.VERSION_MAJOR }}-${{ matrix.tag_suffix }}"
+              --tag "${{ env.ACR_REGISTRY }}/${{ env.DOCKER_HUB_REPO }}:latest-${{ matrix.tag_suffix }}"
+            )
+          fi
+          docker buildx imagetools create "${TAG_ARGS[@]}" "${IMAGE_REF}"

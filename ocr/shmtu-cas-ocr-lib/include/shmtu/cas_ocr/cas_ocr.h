@@ -14,6 +14,8 @@ namespace cv { class Mat; }
 
 namespace shmtu::cas::ocr {
 
+[[nodiscard]] std::string_view library_version() noexcept;
+
 // Main OCR engine class for SHMTU CAS CAPTCHA recognition.
 //
 // Uses PIMPL idiom to hide NCNN/OpenCV implementation details.
@@ -42,8 +44,11 @@ public:
     // Load models from the model_dir specified at construction.
     // precision: "fp16" or "fp32". Defaults to "fp16".
     // use_gpu:   attempt to use GPU (Vulkan) acceleration if available.
+    // num_threads: 0 means auto-tune based on the current runtime mode.
     // Returns true if all three models loaded successfully.
-    bool load_model(std::string_view precision = "fp16", bool use_gpu = false);
+    bool load_model(std::string_view precision = "fp16",
+                    bool use_gpu = false,
+                    int num_threads = 0);
 
     // Release loaded models and free GPU resources.
     void release();

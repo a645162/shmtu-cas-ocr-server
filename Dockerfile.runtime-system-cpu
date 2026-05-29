@@ -4,7 +4,7 @@ ENV DEBIAN_FRONTEND=noninteractive
 ENV SHMTU_MODEL_DIR=/app/models
 ENV SHMTU_HTTP_PORT=21600
 ENV SHMTU_TCP_PORT=21601
-ENV SHMTU_USE_GPU=1
+ENV SHMTU_USE_GPU=0
 ENV SHMTU_WORKERS=0
 ENV SHMTU_QUEUE_CAPACITY=0
 ENV SHMTU_NCNN_THREADS=0
@@ -25,8 +25,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         libpq5 \
         libsqlite3-0 \
         libuuid1 \
-        libvulkan1 \
-        mesa-vulkan-drivers \
         libgomp1 \
         ca-certificates \
         curl \

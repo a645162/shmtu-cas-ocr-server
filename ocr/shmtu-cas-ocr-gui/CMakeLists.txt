@@ -18,6 +18,11 @@ add_executable(shmtu_cas_ocr_gui
     src/model_download.cpp
 )
 
+shmtu_apply_target_version(
+    shmtu_cas_ocr_gui
+    "${SHMTU_CAS_GUI_VERSION}"
+)
+
 target_include_directories(shmtu_cas_ocr_gui
     PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/include

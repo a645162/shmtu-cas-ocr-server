@@ -40,6 +40,11 @@ set(CLI_SOURCES
 # --------------------------------------------------------------------------
 add_executable(shmtu_cas_ocr_cli ${CLI_SOURCES})
 
+shmtu_apply_target_version(
+    shmtu_cas_ocr_cli
+    "${SHMTU_CAS_CLI_VERSION}"
+)
+
 target_link_libraries(shmtu_cas_ocr_cli
     PRIVATE
         SHMTU::CasOcrLib

@@ -29,6 +29,10 @@ int OcrServer::run() {
                 cfg.model_dir.c_str(),
                 cfg.precision.c_str(),
                 cfg.use_gpu ? "true" : "false");
+    std::printf("Runtime tuning: workers=%d, ncnn_threads=%d, queue_capacity=%d\n",
+                cfg.worker_count,
+                cfg.inference_threads,
+                cfg.queue_capacity);
 
     for (int i = 0; i < cfg.worker_count; ++i) {
         auto ocr = std::make_unique<CasOcr>(cfg.model_dir);
@@ -38,7 +42,7 @@ int OcrServer::run() {
             std::printf("GPU device %d: %s\n", gpu.device_index, gpu.device_name.c_str());
         }
 #endif
-        if (!ocr->load_model(cfg.precision, cfg.use_gpu)) {
+        if (!ocr->load_model(cfg.precision, cfg.use_gpu, cfg.inference_threads)) {
             std::fprintf(stderr, "Failed to load model for worker %d\n", i);
             return -1;
         }
@@ -107,6 +111,8 @@ HealthResult OcrServer::health() const {
         health.availability_level = 2;
     }
 
+    health.server_name = impl_->config.server_name;
+
     return health;
 }
 
@@ -122,6 +128,7 @@ ServerStats OcrServer::stats() const {
     stats.models_loaded = impl_->pool && !impl_->pool->workers.empty() &&
                           impl_->pool->workers.front()->is_loaded();
     stats.start_time = impl_->start_time;
+    stats.server_name = impl_->config.server_name;
     return stats;
 }
 

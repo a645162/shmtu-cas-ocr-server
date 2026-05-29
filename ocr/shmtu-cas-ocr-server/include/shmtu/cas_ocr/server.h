@@ -17,9 +17,12 @@ struct ServerConfig {
     std::string precision = "fp16";
     bool use_gpu = false;
 
-    int worker_count = 2;
-    int queue_capacity = 16;
+    int worker_count = 0;
+    int queue_capacity = 0;
+    int inference_threads = 0;
     int log_level = 2;
+
+    std::string server_name;
 };
 
 struct ServerStats {
@@ -32,6 +35,7 @@ struct ServerStats {
     int pending_requests = 0;
     bool models_loaded = false;
     std::chrono::steady_clock::time_point start_time;
+    std::string server_name;
 };
 
 struct HealthResult {
@@ -42,6 +46,7 @@ struct HealthResult {
     int pool_size = 0;
     int queue_capacity = 0;
     int pending_requests = 0;
+    std::string server_name;
 };
 
 class OcrServer {

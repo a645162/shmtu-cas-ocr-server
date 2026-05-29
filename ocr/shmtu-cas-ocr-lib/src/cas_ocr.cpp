@@ -1,4 +1,5 @@
 #include <shmtu/cas_ocr/cas_ocr.h>
+#include <shmtu/cas_ocr/version.h>
 
 #include <algorithm>
 #include <cstring>
@@ -6,6 +7,7 @@
 #include <span>
 #include <string>
 #include <string_view>
+#include <thread>
 #include <vector>
 
 #include <opencv2/core.hpp>
@@ -115,12 +117,17 @@ int compute_result(const int left, const int right, const int raw_op) {
 
 }  // namespace
 
+std::string_view library_version() noexcept {
+    return SHMTU_CAS_OCR_LIB_VERSION;
+}
+
 struct CasOcr::Impl {
     explicit Impl(std::string dir) : model_dir(std::move(dir)) {}
 
     std::string model_dir;
     std::string loaded_precision;
     bool loaded_use_gpu = false;
+    int loaded_num_threads = 0;
     bool is_init = false;
     ModelStatus status = ModelStatus::NotLoaded;
 
@@ -142,10 +149,22 @@ struct CasOcr::Impl {
 #endif
     }
 
-    void set_net_opt(ncnn::Net& net, const bool use_gpu) {
+    static int resolve_num_threads(const int requested, const bool use_gpu) {
+        if (requested > 0) {
+            return requested;
+        }
+
+        const auto hardware_threads = std::max(1u, std::thread::hardware_concurrency());
+        if (use_gpu) {
+            return 1;
+        }
+        return static_cast<int>(std::min(hardware_threads, 4u));
+    }
+
+    void set_net_opt(ncnn::Net& net, const bool use_gpu, const int num_threads) {
         ncnn::Option& opt = net.opt;
         opt.lightmode = true;
-        opt.num_threads = 4;
+        opt.num_threads = std::max(1, num_threads);
         opt.blob_allocator = &blob_allocator;
         opt.workspace_allocator = &workspace_allocator;
 #ifdef NCNN_SUPPORT_VULKAN
@@ -168,21 +187,27 @@ struct CasOcr::Impl {
         return ret_param == 0 && ret_model == 0;
     }
 
-    bool load_all_models(const std::string& precision, const bool requested_use_gpu) {
+    bool load_all_models(const std::string& precision,
+                         const bool requested_use_gpu,
+                         const int requested_num_threads) {
         if (model_dir.empty()) {
             return false;
         }
 
         const bool actual_use_gpu = resolve_use_gpu(requested_use_gpu);
-        if (is_init && loaded_precision == precision && loaded_use_gpu == actual_use_gpu) {
+        const int actual_num_threads = resolve_num_threads(requested_num_threads, actual_use_gpu);
+        if (is_init &&
+            loaded_precision == precision &&
+            loaded_use_gpu == actual_use_gpu &&
+            loaded_num_threads == actual_num_threads) {
             return true;
         }
 
         release();
 
-        set_net_opt(net_equal_symbol, actual_use_gpu);
-        set_net_opt(net_operator, actual_use_gpu);
-        set_net_opt(net_digit, actual_use_gpu);
+        set_net_opt(net_equal_symbol, actual_use_gpu, actual_num_threads);
+        set_net_opt(net_operator, actual_use_gpu, actual_num_threads);
+        set_net_opt(net_digit, actual_use_gpu, actual_num_threads);
 
         bool is_successful = true;
         is_successful = init_model_for_net(
@@ -211,6 +236,7 @@ struct CasOcr::Impl {
 
         loaded_precision = precision;
         loaded_use_gpu = actual_use_gpu;
+        loaded_num_threads = actual_num_threads;
         is_init = true;
         status = loaded_use_gpu ? ModelStatus::LoadedGPU : ModelStatus::LoadedCPU;
         return true;
@@ -306,6 +332,7 @@ struct CasOcr::Impl {
         workspace_allocator.clear();
         loaded_precision.clear();
         loaded_use_gpu = false;
+        loaded_num_threads = 0;
         is_init = false;
         status = ModelStatus::NotLoaded;
     }
@@ -318,10 +345,13 @@ CasOcr::~CasOcr() = default;
 CasOcr::CasOcr(CasOcr&&) noexcept = default;
 CasOcr& CasOcr::operator=(CasOcr&&) noexcept = default;
 
-bool CasOcr::load_model(const std::string_view precision, const bool use_gpu) {
+bool CasOcr::load_model(const std::string_view precision,
+                        const bool use_gpu,
+                        const int num_threads) {
     return impl_->load_all_models(
         precision.empty() ? "fp16" : std::string(precision),
-        use_gpu);
+        use_gpu,
+        num_threads);
 }
 
 void CasOcr::release() {
