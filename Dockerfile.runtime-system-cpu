@@ -36,13 +36,17 @@ RUN mkdir -p /opt/shmtu/bin /app/models
 
 WORKDIR /app
 
+COPY scripts/docker_download_models.sh /opt/shmtu/bin/docker_download_models.sh
+COPY scripts/docker_runtime_entrypoint.sh /opt/shmtu/bin/docker_runtime_entrypoint.sh
 COPY docker-runtime/shmtu_cas_ocr_server /opt/shmtu/bin/shmtu_cas_ocr_server
 COPY docker-runtime/shmtu_cas_ocr_cli /opt/shmtu/bin/shmtu_cas_ocr_cli
+
+RUN chmod +x /opt/shmtu/bin/docker_download_models.sh /opt/shmtu/bin/docker_runtime_entrypoint.sh
 
 EXPOSE 21600
 EXPOSE 21601
 
-ENTRYPOINT ["/opt/shmtu/bin/shmtu_cas_ocr_server"]
+ENTRYPOINT ["/opt/shmtu/bin/docker_runtime_entrypoint.sh"]
 
 # Bundled variant (with model weights included)
 FROM runtime AS bundled

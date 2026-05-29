@@ -58,15 +58,18 @@ RUN apt-get update \
 
 COPY --from=builder-cpu /install /opt/shmtu
 COPY --from=builder-cpu /build/build/linux-vcpkg/vcpkg_installed /opt/shmtu/vcpkg_installed
+COPY scripts/docker_download_models.sh /opt/shmtu/bin/docker_download_models.sh
+COPY scripts/docker_runtime_entrypoint.sh /opt/shmtu/bin/docker_runtime_entrypoint.sh
 
 RUN mkdir -p /app/models
+RUN chmod +x /opt/shmtu/bin/docker_download_models.sh /opt/shmtu/bin/docker_runtime_entrypoint.sh
 
 WORKDIR /app
 
 EXPOSE 21600
 EXPOSE 21601
 
-ENTRYPOINT ["/opt/shmtu/bin/shmtu_cas_ocr_server"]
+ENTRYPOINT ["/opt/shmtu/bin/docker_runtime_entrypoint.sh"]
 CMD ["--model-dir", "/app/models", "--http-port", "21600", "--tcp-port", "21601"]
 
 FROM ubuntu:24.04 AS runtime-gpu
@@ -86,15 +89,18 @@ RUN apt-get update \
 
 COPY --from=builder-gpu /install /opt/shmtu
 COPY --from=builder-gpu /build/build/linux-vcpkg-vulkan/vcpkg_installed /opt/shmtu/vcpkg_installed
+COPY scripts/docker_download_models.sh /opt/shmtu/bin/docker_download_models.sh
+COPY scripts/docker_runtime_entrypoint.sh /opt/shmtu/bin/docker_runtime_entrypoint.sh
 
 RUN mkdir -p /app/models
+RUN chmod +x /opt/shmtu/bin/docker_download_models.sh /opt/shmtu/bin/docker_runtime_entrypoint.sh
 
 WORKDIR /app
 
 EXPOSE 21600
 EXPOSE 21601
 
-ENTRYPOINT ["/opt/shmtu/bin/shmtu_cas_ocr_server"]
+ENTRYPOINT ["/opt/shmtu/bin/docker_runtime_entrypoint.sh"]
 CMD ["--model-dir", "/app/models", "--http-port", "21600", "--tcp-port", "21601", "--use-gpu"]
 
 # ============================================================
