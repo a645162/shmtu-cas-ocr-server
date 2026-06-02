@@ -414,3 +414,7 @@ FodyWeavers.xsd
 *.exe
 *.out
 *.app
+
+# VitePress docs build output
+Documents/docs/.vitepress/dist/
+Documents/docs/.vitepress/cache/

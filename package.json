@@ -1,0 +1,14 @@
+{
+  "name": "shmtu-cas-ocr-server",
+  "private": true,
+  "version": "2.0.0",
+  "type": "module",
+  "scripts": {
+    "docs:dev": "vitepress dev Documents/docs",
+    "docs:build": "vitepress build Documents/docs",
+    "docs:preview": "vitepress preview Documents/docs"
+  },
+  "devDependencies": {
+    "vitepress": "^2.0.0-alpha.12"
+  }
+}

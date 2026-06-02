@@ -4,10 +4,12 @@
 
 #include <curl/curl.h>
 
+#include <cstdio>
 #include <filesystem>
 #include <fstream>
 #include <sstream>
 #include <string>
+#include <unordered_map>
 
 namespace shmtu::cas::ocr::gui {
 namespace {
@@ -135,6 +137,77 @@ bool downloadUrlToFile(const std::string& url,
     return ok;
 }
 
+std::string computeSha256(const std::string& filepath) {
+    std::string cmd = "sha256sum \"" + filepath + "\" 2>/dev/null";
+    FILE* pipe = popen(cmd.c_str(), "r");
+    if (!pipe) {
+        logMessage("computeSha256: popen failed for " + filepath);
+        return "";
+    }
+    char buf[65] = {0};
+    if (!fgets(buf, 64, pipe)) {
+        pclose(pipe);
+        logMessage("computeSha256: sha256sum produced no output for " + filepath);
+        return "";
+    }
+    pclose(pipe);
+    std::string result(buf);
+    // sha256sum output format: "<hash>  <filename>" — extract hash only
+    auto space_pos = result.find(' ');
+    if (space_pos != std::string::npos) {
+        result = result.substr(0, space_pos);
+    }
+    // Trim trailing whitespace
+    while (!result.empty() && (result.back() == '\n' || result.back() == '\r' ||
+                               result.back() == ' ')) {
+        result.pop_back();
+    }
+    return result;
+}
+
+std::unordered_map<std::string, std::string> fetchChecksums(const std::string& base_url) {
+    std::unordered_map<std::string, std::string> checksums;
+    const auto url = base_url + "/SHA256SUMS.txt";
+
+    std::vector<uint8_t> data;
+    long http_status = 0;
+    std::string error_message;
+
+    const bool ok = curlDownload(url, curlWriteToVector, &data, nullptr, 30L,
+                                 http_status, error_message);
+    if (!ok || http_status != 200 || data.empty()) {
+        logMessage("fetchChecksums: failed to download SHA256SUMS.txt, url=" + url);
+        return checksums;
+    }
+
+    std::string content(data.begin(), data.end());
+    std::istringstream stream(content);
+    std::string line;
+    while (std::getline(stream, line)) {
+        if (!line.empty() && line.back() == '\r') {
+            line.pop_back();
+        }
+        if (line.empty()) continue;
+        // Format: "<64-char-hex>  <filename>"
+        if (line.size() < 66) continue;
+        auto space_pos = line.find(' ');
+        if (space_pos != 64) continue;
+        std::string hash = line.substr(0, 64);
+        auto filename_start = line.find_first_not_of(' ', space_pos);
+        if (filename_start == std::string::npos) continue;
+        std::string filename = line.substr(filename_start);
+        // Remove leading "./" if present
+        if (filename.size() > 2 && filename[0] == '.' && filename[1] == '/') {
+            filename = filename.substr(2);
+        }
+        checksums[filename] = hash;
+    }
+
+    logMessage("fetchChecksums: loaded " + std::to_string(checksums.size()) +
+               " checksums from " + url);
+    return checksums;
+}
+
 }  // namespace
 
 std::vector<std::string> missingModelFiles(const std::string& model_dir,
@@ -182,6 +255,18 @@ bool downloadModelFiles(const std::string& model_dir,
         return false;
     }
 
+    // Fetch checksums for integrity verification
+    const std::string primary_base_url = use_gitee ? GITEE_BASE_URL : GITHUB_BASE_URL;
+    const auto checksums = fetchChecksums(primary_base_url);
+    {
+        std::ostringstream oss;
+        oss << "downloadModelFiles: checksums"
+            << ", available=" << (checksums.empty() ? "false" : "true")
+            << ", count=" << checksums.size();
+        logMessage(oss.str());
+    }
+
+    constexpr int MAX_ATTEMPTS = 3;
     const int total_files = static_cast<int>(missing_files.size());
     int completed_files = 0;
     bool all_ok = true;
@@ -197,34 +282,58 @@ bool downloadModelFiles(const std::string& model_dir,
         auto filepath = (std::filesystem::path(model_dir) / filename).string();
         bool download_ok = false;
 
-        auto try_download = [&](const std::string& base_url) -> bool {
-            const auto url = base_url + "/" + filename;
-            long http_status = 0;
-            std::string curl_error;
+        for (int attempt = 1; attempt <= MAX_ATTEMPTS && !download_ok; ++attempt) {
+            const char* sources[] = {
+                use_gitee ? GITEE_BASE_URL : GITHUB_BASE_URL,
+                use_gitee ? GITHUB_BASE_URL : GITEE_BASE_URL
+            };
 
-            logMessage("downloadModelFiles: requesting " + url);
-            const bool ok = downloadUrlToFile(url, filepath, http_status, curl_error);
-            if (ok && http_status == 200) {
-                logMessage("downloadModelFiles: file downloaded, filepath=" + filepath);
-                return true;
+            for (const char* base_url : sources) {
+                const auto url = std::string(base_url) + "/" + filename;
+                long http_status = 0;
+                std::string curl_error;
+
+                logMessage("downloadModelFiles: requesting " + url +
+                           ", attempt=" + std::to_string(attempt));
+                const bool ok = downloadUrlToFile(url, filepath, http_status, curl_error);
+                if (!ok || http_status != 200) {
+                    std::error_code ec;
+                    std::filesystem::remove(filepath, ec);
+                    logMessage("downloadModelFiles: download failed, status=" +
+                               std::to_string(http_status) + ", error=" + curl_error);
+                    continue;
+                }
+
+                // HTTP 200 — verify checksum if available
+                const auto checksum_it = checksums.find(filename);
+                if (checksum_it != checksums.end()) {
+                    const auto actual_hash = computeSha256(filepath);
+                    if (actual_hash.empty()) {
+                        logMessage("downloadModelFiles: sha256sum command failed for " +
+                                   filename + ", skipping verification");
+                    } else if (actual_hash != checksum_it->second) {
+                        std::error_code ec;
+                        std::filesystem::remove(filepath, ec);
+                        logMessage("downloadModelFiles: checksum mismatch for " + filename +
+                                   ", expected=" + checksum_it->second +
+                                   ", actual=" + actual_hash +
+                                   ", attempt=" + std::to_string(attempt));
+                        continue;
+                    } else {
+                        logMessage("downloadModelFiles: checksum verified for " + filename);
+                    }
+                } else {
+                    logMessage("downloadModelFiles: no checksum for " + filename +
+                               ", skipping verification");
+                }
+
+                download_ok = true;
+                break;
             }
 
-            std::error_code ec;
-            std::filesystem::remove(filepath, ec);
-            logMessage("downloadModelFiles: failed, status=" + std::to_string(http_status) +
-                       ", error=" + curl_error);
-            return false;
-        };
-
-        if (use_gitee) {
-            download_ok = try_download(GITEE_BASE_URL);
-            if (!download_ok) {
-                download_ok = try_download(GITHUB_BASE_URL);
-            }
-        } else {
-            download_ok = try_download(GITHUB_BASE_URL);
-            if (!download_ok) {
-                download_ok = try_download(GITEE_BASE_URL);
+            if (!download_ok && attempt < MAX_ATTEMPTS) {
+                logMessage("downloadModelFiles: retrying file=" + filename +
+                           ", next_attempt=" + std::to_string(attempt + 1));
             }
         }
 
@@ -267,7 +376,7 @@ bool downloadUrlToMemory(const std::string& url,
             << ", http_status=" << http_status
             << ", bytes=" << output.size();
         if (!error_message.empty()) {
-            oss << ", error=" << error_message;
+            oss << ", error=" + error_message;
         }
         logMessage(oss.str());
     }

@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import shutil
 import sys
 import tempfile
@@ -24,6 +25,10 @@ DEFAULT_FILES = (
     "resnet34_digit_latest.fp16.bin",
     "resnet34_digit_latest.fp16.param",
 )
+
+MAX_RETRIES = 3
+CHECKSUM_FILENAME = "SHA256SUMS.txt"
+CHUNK = 64 * 1024
 
 
 def parse_args() -> argparse.Namespace:
@@ -47,6 +52,39 @@ def parse_args() -> argparse.Namespace:
         help="Redownload and replace existing files.",
     )
     return parser.parse_args()
+
+
+def sha256_file(path: Path) -> str:
+    h = hashlib.sha256()
+    with path.open("rb") as fp:
+        for chunk in iter(lambda: fp.read(CHUNK), b""):
+            h.update(chunk)
+    return h.hexdigest()
+
+
+def fetch_checksums(base_url: str) -> dict[str, str]:
+    """Download SHA256SUMS.txt from the release and parse it."""
+    url = f"{base_url.rstrip('/')}/{CHECKSUM_FILENAME}"
+    try:
+        with urllib.request.urlopen(url, timeout=30) as resp:
+            text = resp.read().decode("utf-8")
+    except urllib.error.HTTPError:
+        return {}
+    except urllib.error.URLError:
+        return {}
+
+    result: dict[str, str] = {}
+    for line in text.splitlines():
+        line = line.strip()
+        if not line or line.startswith("#"):
+            continue
+        parts = line.split(None, 1)
+        if len(parts) != 2:
+            continue
+        hex_digest, filename = parts
+        filename = filename.lstrip("*")
+        result[filename] = hex_digest.lower()
+    return result
 
 
 def download_file(url: str, destination: Path) -> None:
@@ -83,6 +121,29 @@ def download_file(url: str, destination: Path) -> None:
             tmp_path.unlink()
 
 
+def download_file_with_verify(
+    url: str, destination: Path, expected_hash: str | None, retries: int = MAX_RETRIES
+) -> None:
+    """Download a file and verify its SHA256. Retry up to *retries* times on mismatch."""
+    for attempt in range(1, retries + 1):
+        download_file(url, destination)
+        if expected_hash is None:
+            return
+        actual = sha256_file(destination)
+        if actual == expected_hash:
+            return
+        print(
+            f"  SHA256 mismatch for {destination.name} "
+            f"(attempt {attempt}/{retries}): "
+            f"expected {expected_hash[:16]}..., got {actual[:16]}..."
+        )
+        if attempt < retries:
+            destination.unlink(missing_ok=True)
+    raise RuntimeError(
+        f"SHA256 verification failed for {destination.name} after {retries} attempts"
+    )
+
+
 def main() -> int:
     args = parse_args()
     destination_dir = args.dest.resolve()
@@ -91,19 +152,37 @@ def main() -> int:
     print(f"Destination: {destination_dir}")
     print(f"Base URL: {args.base_url}")
 
+    checksums = fetch_checksums(args.base_url)
+    if checksums:
+        print(f"Loaded {len(checksums)} expected checksums from {CHECKSUM_FILENAME}")
+    else:
+        print(f"Warning: could not fetch {CHECKSUM_FILENAME}, skipping verification")
+
     downloaded_count = 0
     skipped_count = 0
 
     for filename in DEFAULT_FILES:
         destination = destination_dir / filename
         if destination.exists() and not args.force:
-            print(f"Skip existing: {destination.name}")
-            skipped_count += 1
-            continue
+            expected = checksums.get(filename)
+            if expected is not None:
+                actual = sha256_file(destination)
+                if actual != expected:
+                    print(f"  Existing {filename} has wrong SHA256, redownloading")
+                    destination.unlink()
+                else:
+                    print(f"Skip existing (verified): {destination.name}")
+                    skipped_count += 1
+                    continue
+            else:
+                print(f"Skip existing: {destination.name}")
+                skipped_count += 1
+                continue
 
         url = f"{args.base_url.rstrip('/')}/{filename}"
+        expected_hash = checksums.get(filename)
         print(f"Downloading: {filename}")
-        download_file(url, destination)
+        download_file_with_verify(url, destination, expected_hash)
         downloaded_count += 1
 
     print(
