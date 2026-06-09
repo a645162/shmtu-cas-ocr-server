@@ -68,6 +68,11 @@ std::expected<CliConfig, std::string> parse_args(int argc, char* argv[]) {
         ->capture_default_str()
         ->check(CLI::IsMember(std::set<std::string>{"fp16", "fp32"}));
     app.add_flag("--use-gpu", config.use_gpu, "Enable GPU acceleration");
+    std::string model_version_str = "v2";
+    app.add_option("--model-version", model_version_str,
+                   "Model version: v1 (3-model) or v2 (TriSlot, default)")
+        ->capture_default_str()
+        ->check(CLI::IsMember(std::set<std::string>{"v1", "v2", "V1", "V2", "1", "2"}));
     app.add_flag("--json", config.json_output, "Output results as JSON");
     app.add_option("--server", server_endpoint, "Use remote OCR server instead of local model");
     app.add_flag("--compare", config.compare_mode, "Compare local OCR vs remote server results");
@@ -77,6 +82,8 @@ std::expected<CliConfig, std::string> parse_args(int argc, char* argv[]) {
     } catch (const CLI::ParseError& error) {
         std::exit(app.exit(error));
     }
+
+    config.model_version = shmtu::cas::ocr::model_version_from_string(model_version_str);
 
     if (!server_endpoint.empty()) {
         auto endpoint = parse_server_endpoint(server_endpoint);

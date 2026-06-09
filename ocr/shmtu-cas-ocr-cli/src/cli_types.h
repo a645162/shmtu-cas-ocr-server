@@ -21,12 +21,14 @@ struct RemoteOcrResult {
     std::string error;
     int http_status = 0;
     bool request_ok = false;
+    int model_version = 0;
 };
 
 struct CliConfig {
     std::string model_dir = "./models";
     std::string precision = "fp16";
     bool use_gpu = false;
+    shmtu::cas::ocr::ModelVersion model_version = shmtu::cas::ocr::ModelVersion::V2;
     bool json_output = false;
     std::string input_path;
     std::string server_host;

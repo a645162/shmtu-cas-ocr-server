@@ -156,6 +156,7 @@ RemoteOcrResult call_remote_ocr(const std::string& host,
         result.digit1 = json_util::extract_int(body, "digit1");
         result.digit2 = json_util::extract_int(body, "digit2");
         result.error = json_util::extract_string(body, "error");
+        result.model_version = json_util::extract_int(body, "modelVersion");
     } catch (const std::exception& exception) {
         result.request_ok = false;
         result.error = std::string("Exception: ") + exception.what();

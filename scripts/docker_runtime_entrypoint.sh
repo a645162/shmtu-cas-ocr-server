@@ -63,9 +63,21 @@ log "  download_models_bin=${DOWNLOAD_MODELS_BIN}"
 log "  log_dir=${LOG_DIR}"
 log "  log_file=${LOG_FILE}"
 log "  model_dir=${SHMTU_MODEL_DIR:-/app/models}"
+log "  model_version=${SHMTU_MODEL_VERSION:-v2}"
 log "  model_source=${SHMTU_MODEL_SOURCE:-github}"
 log "  auto_download_models=${SHMTU_AUTO_DOWNLOAD_MODELS:-1}"
 log "  server_args=${SERVER_ARGS[*]:-<none>}"
+
+# Forward the model-version flag to the server binary if the caller did not
+# already set it via the env.  Default to v2 (TriSlot decoder) per project
+# policy.
+if ! printf '%s\n' "${SERVER_ARGS[@]}" | grep -q -- "--model-version"; then
+  if [ -z "${SHMTU_MODEL_VERSION:-}" ]; then
+    SERVER_ARGS+=("--model-version" "v2")
+  else
+    SERVER_ARGS+=("--model-version" "${SHMTU_MODEL_VERSION}")
+  fi
+fi
 
 bash "${DOWNLOAD_MODELS_BIN}" "${SERVER_ARGS[@]}"
 

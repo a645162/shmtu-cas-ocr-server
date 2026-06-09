@@ -14,6 +14,8 @@ find_package(ncnn REQUIRED)
 set(LIB_SOURCES
     src/base64.cpp
     src/cas_ocr.cpp
+    src/v1_engine.cpp
+    src/v2_engine.cpp
 )
 
 set(LIB_HEADERS_PUBLIC
@@ -21,6 +23,11 @@ set(LIB_HEADERS_PUBLIC
     include/shmtu/cas_ocr/cas_ocr.h
     include/shmtu/cas_ocr/types.h
     ${CMAKE_CURRENT_BINARY_DIR}/generated/include/shmtu/cas_ocr/version.h
+)
+
+set(LIB_HEADERS_PRIVATE
+    src/v1_engine.h
+    src/v2_engine.h
 )
 
 configure_file(
@@ -32,7 +39,7 @@ configure_file(
 # --------------------------------------------------------------------------
 # Static library target
 # --------------------------------------------------------------------------
-add_library(shmtu_cas_ocr_lib STATIC ${LIB_SOURCES} ${LIB_HEADERS_PUBLIC})
+add_library(shmtu_cas_ocr_lib STATIC ${LIB_SOURCES} ${LIB_HEADERS_PUBLIC} ${LIB_HEADERS_PRIVATE})
 
 add_library(SHMTU::CasOcrLib ALIAS shmtu_cas_ocr_lib)
 

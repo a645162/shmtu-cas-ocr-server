@@ -164,11 +164,12 @@ int run_cli(const CliConfig& config) {
     std::unique_ptr<shmtu::cas::ocr::CasOcr> ocr;
     if (need_local) {
         ocr = std::make_unique<shmtu::cas::ocr::CasOcr>(config.model_dir);
-        std::printf("Loading models from: %s (precision=%s, gpu=%s)...\n",
+        std::printf("Loading models from: %s (precision=%s, gpu=%s, version=%s)...\n",
                     config.model_dir.c_str(),
                     config.precision.c_str(),
-                    config.use_gpu ? "true" : "false");
-        if (!ocr->load_model(config.precision, config.use_gpu)) {
+                    config.use_gpu ? "true" : "false",
+                    shmtu::cas::ocr::model_version_to_string(config.model_version).c_str());
+        if (!ocr->load_model(config.precision, config.use_gpu, 0, config.model_version)) {
             std::fprintf(stderr, "Failed to load models.\n");
             return 1;
         }

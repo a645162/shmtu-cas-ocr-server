@@ -110,6 +110,7 @@ Json::Value predict_result_to_json(const PredictResult& result) {
     json["operator"] = result.op;
     json["digit1"] = result.digit1;
     json["digit2"] = result.digit2;
+    json["modelVersion"] = result.model_version;
     json["error"] = result.error.empty() ? Json::Value() : Json::Value(result.error);
     return json;
 }

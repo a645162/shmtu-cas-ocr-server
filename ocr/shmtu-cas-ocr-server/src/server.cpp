@@ -47,10 +47,11 @@ int OcrServer::run() {
         });
     }
 
-    std::printf("Loading models from: %s (precision=%s, gpu=%s)\n",
+    std::printf("Loading models from: %s (precision=%s, gpu=%s, version=%s)\n",
                 cfg.model_dir.c_str(),
                 cfg.precision.c_str(),
-                cfg.use_gpu ? "true" : "false");
+                cfg.use_gpu ? "true" : "false",
+                model_version_to_string(cfg.model_version).c_str());
     std::printf("Runtime tuning: workers=%d, ncnn_threads=%d, queue_capacity=%d\n",
                 cfg.worker_count,
                 cfg.inference_threads,
@@ -67,7 +68,7 @@ int OcrServer::run() {
                       << gpu.device_index << " (" << gpu.device_name << ")";
         }
 #endif
-        if (!ocr->load_model(cfg.precision, cfg.use_gpu, cfg.inference_threads)) {
+        if (!ocr->load_model(cfg.precision, cfg.use_gpu, cfg.inference_threads, cfg.model_version)) {
             std::fprintf(stderr, "Failed to load model for worker %d\n", i);
             LOG(ERROR) << "Failed to load model for worker " << i;
             return -1;

@@ -33,6 +33,7 @@ int main(int argc, char* argv[]) {
               << " tcp=" << config->tcp_host << ":" << config->tcp_port
               << " model_dir=" << config->model_dir
               << " precision=" << config->precision
+              << " model_version=" << model_version_to_string(config->model_version)
               << " workers=" << config->worker_count
               << " ncnn_threads=" << config->inference_threads
               << " use_gpu=" << config->use_gpu

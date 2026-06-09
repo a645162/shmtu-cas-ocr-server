@@ -1,5 +1,7 @@
 #pragma once
 
+#include <shmtu/cas_ocr/cas_ocr.h>
+
 #include <memory>
 #include <string>
 #include <chrono>
@@ -16,6 +18,7 @@ struct ServerConfig {
     std::string model_dir = "./models";
     std::string precision = "fp16";
     bool use_gpu = false;
+    ModelVersion model_version = ModelVersion::V2;  // V2 is the new default.
 
     int worker_count = 0;
     int queue_capacity = 0;

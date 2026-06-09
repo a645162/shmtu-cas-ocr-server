@@ -23,14 +23,23 @@ namespace shmtu::cas::ocr {
 // thread-safe inference. Multiple instances can run in parallel
 // (intended for worker-pool pattern in the server).
 //
+// Two model versions are supported and selected at load time:
+//   * ModelVersion::V1 — original 3-model pipeline
+//                         (resnet18 equal-symbol / resnet18 operator /
+//                          resnet34 digit) stored under <model_dir>/v1/.
+//   * ModelVersion::V2 — single trislot-decoder model (default)
+//                         stored under <model_dir>/v2/.
+// A backward-compatibility lookup also falls back to <model_dir>/ for the
+// V1 filenames when <model_dir>/v1/ is not present.
+//
 // Usage:
 //   shmtu::cas::ocr::CasOcr ocr("/path/to/models");
-//   ocr.load_model("fp16", false);
+//   ocr.load_model("fp16", false);  // defaults to ModelVersion::V2
 //   auto result = ocr.predict("/path/to/captcha.png");
 class CasOcr {
 public:
     // Construct an OCR engine.
-    // model_dir: directory containing .param/.bin model files.
+    // model_dir: directory containing versioned subfolders (v1/, v2/).
     explicit CasOcr(std::string model_dir = "");
 
     ~CasOcr();
@@ -42,13 +51,23 @@ public:
     CasOcr& operator=(CasOcr&&) noexcept;
 
     // Load models from the model_dir specified at construction.
-    // precision: "fp16" or "fp32". Defaults to "fp16".
-    // use_gpu:   attempt to use GPU (Vulkan) acceleration if available.
-    // num_threads: 0 means auto-tune based on the current runtime mode.
-    // Returns true if all three models loaded successfully.
+    // precision:    "fp16" or "fp32". Defaults to "fp16".
+    // use_gpu:      attempt to use GPU (Vulkan) acceleration if available.
+    // num_threads:  0 means auto-tune based on the current runtime mode.
+    // version:      ModelVersion::V2 by default. Selects v1/ or v2/ subdir.
+    // Returns true if all required models loaded successfully.
     bool load_model(std::string_view precision = "fp16",
                     bool use_gpu = false,
-                    int num_threads = 0);
+                    int num_threads = 0,
+                    ModelVersion version = ModelVersion::V2);
+
+    // Backwards-compatible overload: defaults to V2 (new default).
+    // Retained so existing callers continue to compile and link.
+    bool load_model_v1(std::string_view precision = "fp16",
+                       bool use_gpu = false,
+                       int num_threads = 0) {
+        return load_model(precision, use_gpu, num_threads, ModelVersion::V1);
+    }
 
     // Release loaded models and free GPU resources.
     void release();
@@ -56,6 +75,7 @@ public:
     // Query model state.
     bool is_loaded() const;
     ModelStatus model_status() const;
+    ModelVersion model_version() const;
 
     // Predict CAPTCHA from an OpenCV Mat (BGR, 3-channel).
     // Thread-safe: internally locked per instance.

@@ -106,10 +106,21 @@ CMD ["--model-dir", "/app/models", "--http-port", "21600", "--tcp-port", "21601"
 # ============================================================
 # Bundled variants (with model weights included)
 # ============================================================
+#
+# The runtime image expects models under <model_dir>/v2/ by default
+# (V2 / TriSlot decoder).  The V1 (3-model) layout lives under
+# <model_dir>/v1/ and is only bundled when SHMTU_INCLUDE_V1=1 is set
+# at build time (e.g. `--build-arg SHMTU_INCLUDE_V1=1`).
+# ============================================================
+ARG SHMTU_INCLUDE_V1=0
+ARG SHMTU_MODEL_DIR=/app/models
+
 FROM runtime-cpu AS runtime-cpu-bundled
 
-COPY models/ /app/models/
+COPY --from=builder-cpu /build/models/v2/ ${SHMTU_MODEL_DIR}/v2/
+ONBUILD COPY models/v2/ ${SHMTU_MODEL_DIR}/v2/
 
 FROM runtime-gpu AS runtime-gpu-bundled
 
-COPY models/ /app/models/
+COPY --from=builder-gpu /build/models/v2/ ${SHMTU_MODEL_DIR}/v2/
+ONBUILD COPY models/v2/ ${SHMTU_MODEL_DIR}/v2/

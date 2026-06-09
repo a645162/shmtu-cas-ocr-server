@@ -77,6 +77,11 @@ std::expected<void, std::string> apply_env_overrides(
         config.precision = value;
         record_override("SHMTU_PRECISION=" + config.precision);
     }
+    if (const char* value = std::getenv("SHMTU_MODEL_VERSION")) {
+        config.model_version = model_version_from_string(value);
+        record_override(std::string("SHMTU_MODEL_VERSION=") +
+                        model_version_to_string(config.model_version));
+    }
     if (const char* value = std::getenv("SHMTU_SERVER_NAME")) {
         config.server_name = value;
         record_override("SHMTU_SERVER_NAME=" + config.server_name);
@@ -197,7 +202,8 @@ std::expected<ServerConfig, std::string> parse_server_config(
         "  defaults -> environment variables -> CLI options\n"
         "Environment:\n"
         "  SHMTU_HTTP_HOST SHMTU_HTTP_PORT SHMTU_TCP_HOST SHMTU_TCP_PORT\n"
-        "  SHMTU_MODEL_DIR SHMTU_PRECISION SHMTU_USE_GPU SHMTU_SERVER_NAME\n"
+        "  SHMTU_MODEL_DIR SHMTU_PRECISION SHMTU_MODEL_VERSION\n"
+        "  SHMTU_USE_GPU SHMTU_SERVER_NAME\n"
         "  SHMTU_WORKERS SHMTU_QUEUE_CAPACITY SHMTU_NCNN_THREADS\n"
         "  SHMTU_LOG_DIR SHMTU_LOG_FILE_PREFIX SHMTU_LOG_MIN_LEVEL\n"
         "  SHMTU_LOG_TO_STDERR SHMTU_LOG_ALSO_TO_STDERR SHMTU_LOG_MAX_SIZE_MB\n"
@@ -215,6 +221,11 @@ std::expected<ServerConfig, std::string> parse_server_config(
     app.add_option("--precision", config.precision, "Model precision")
         ->capture_default_str()
         ->check(CLI::IsMember(std::set<std::string>{"fp16", "fp32"}));
+    std::string model_version_str = "v2";
+    app.add_option("--model-version", model_version_str,
+                   "Model version: v1 (3-model) or v2 (TriSlot, default)")
+        ->capture_default_str()
+        ->check(CLI::IsMember(std::set<std::string>{"v1", "v2", "V1", "V2", "1", "2"}));
     app.add_option("--workers", config.worker_count, "Number of OCR workers (0 = auto)")
         ->capture_default_str()
         ->check(CLI::Range(0, kIntMax));
@@ -287,6 +298,7 @@ std::expected<ServerConfig, std::string> parse_server_config(
     if (config.precision != "fp16" && config.precision != "fp32") {
         return std::unexpected("Unsupported precision: " + config.precision);
     }
+    config.model_version = model_version_from_string(model_version_str);
     if (config.http_port <= 0 || config.tcp_port <= 0) {
         return std::unexpected("Ports must be positive integers");
     }
@@ -312,6 +324,7 @@ void print_runtime_configuration(const ServerConfig& config) {
     std::printf("  TCP port:       %d\n", config.tcp_port);
     std::printf("  Model dir:      %s\n", config.model_dir.c_str());
     std::printf("  Precision:      %s\n", config.precision.c_str());
+    std::printf("  Model version:  %s\n", model_version_to_string(config.model_version).c_str());
     std::printf("  Workers:        %d\n", config.worker_count);
     std::printf("  NCNN threads:   %d\n", config.inference_threads);
     std::printf("  Use GPU:        %s\n", config.use_gpu ? "true" : "false");

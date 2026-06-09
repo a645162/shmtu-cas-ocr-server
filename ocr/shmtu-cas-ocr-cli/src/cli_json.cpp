@@ -29,7 +29,8 @@ std::string predict_result_to_json(const shmtu::cas::ocr::PredictResult& result)
     json += "\"equalSymbol\":" + std::to_string(result.equal_symbol) + ",";
     json += "\"operator\":" + std::to_string(result.op) + ",";
     json += "\"digit1\":" + std::to_string(result.digit1) + ",";
-    json += "\"digit2\":" + std::to_string(result.digit2);
+    json += "\"digit2\":" + std::to_string(result.digit2) + ",";
+    json += "\"modelVersion\":" + std::to_string(result.model_version);
     if (!result.error.empty()) {
         json += ",\"error\":\"" + json_escape(result.error) + "\"";
     }
@@ -45,7 +46,8 @@ std::string remote_result_to_json(const RemoteOcrResult& result) {
     json += "\"equalSymbol\":" + std::to_string(result.equal_symbol) + ",";
     json += "\"operator\":" + std::to_string(result.op) + ",";
     json += "\"digit1\":" + std::to_string(result.digit1) + ",";
-    json += "\"digit2\":" + std::to_string(result.digit2);
+    json += "\"digit2\":" + std::to_string(result.digit2) + ",";
+    json += "\"modelVersion\":" + std::to_string(result.model_version);
     if (!result.error.empty()) {
         json += ",\"error\":\"" + json_escape(result.error) + "\"";
     }
