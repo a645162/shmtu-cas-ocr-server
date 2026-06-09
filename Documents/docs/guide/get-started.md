@@ -209,15 +209,20 @@ curl http://localhost:21600/api/health
 
 ## CLI 工具
 
-构建完成后，可以使用 CLI 工具进行本地或远程识别测试：
+构建完成后，可以使用 CLI 工具进行本地或远程识别测试。CLI 支持 v1 / v2 模型切换：
 
 ```bash
-# 本地识别
+# 本地识别（默认 v2）
 ./shmtu_cas_ocr_cli --model-dir ./models captcha.png
+
+# 显式使用 v1
+./shmtu_cas_ocr_cli --model-dir ./models --model-version v1 captcha.png
 
 # 远程识别（连接到服务端）
 ./shmtu_cas_ocr_cli --server 127.0.0.1:21600 captcha.png
 ```
+
+详见 [模型管理](/guide/model-management)。
 
 ## 依赖栈
 

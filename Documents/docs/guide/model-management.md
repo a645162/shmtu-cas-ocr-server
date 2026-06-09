@@ -4,19 +4,35 @@ title: 模型管理
 
 # 模型管理
 
-SHMTU CAS OCR Server 使用 NCNN 格式的模型权重进行验证码识别。本章介绍模型的获取、部署和管理方式。
+SHMTU CAS OCR Server 同时支持 v1（legacy）与 v2（**默认**）两套模型。本章介绍两套模型的获取、部署、切换与管理。
+
+## 模型版本对比
+
+| 维度 | v1 (legacy) | v2 (**默认**) |
+|------|-------------|---------------|
+| 模型数量 | 3 个独立模型 | **1 个** |
+| 一次推理 | 4 次前向（先判等号样式 → 算子 → 两数字） | **1 次** 端到端 |
+| Backbone | resnet18 / resnet34 | `mobilenet_v3_small` |
+| 输入 | RGB 3×224×224 | 灰度 1×64×192 |
+| 精度 | fp16 / fp32 | fp16 |
+| 运算符类别 | 6 类（含中文） | 3 类（`+`、`-`、`×`） |
+| Release Tag | `v1.0-NCNN` | `v2.0.x` |
+| 资产清单 | `SHA256SUMS.txt` | `model-assets.json`（含 hash 字段） |
 
 ## 模型权重来源
 
-模型权重托管在 [shmtu-cas-ocr-model](https://github.com/a645162/shmtu-cas-ocr-model) 项目中，需要从 [GitHub Release](https://github.com/a645162/shmtu-cas-ocr-model/releases) 下载 NCNN 版权重。
+模型权重托管在 [shmtu-cas-ocr-model](https://github.com/a645162/shmtu-cas-ocr-model) 项目中：
+
+- **v1 权重**：从 release 标签 `v1.0-NCNN` 下载
+- **v2 权重**：从 release 标签 `v2.0.x` 下载，配套 `model-assets.json` 清单
 
 ### 模型训练
 
-验证码识别模型使用 PyTorch 和经典网络 ResNet 训练，训练代码同样在 shmtu-cas-ocr-model 仓库中。训练流程包括：
+验证码识别模型使用 PyTorch 训练，训练代码同样在 shmtu-cas-ocr-model 仓库中。训练流程包括：
 
 1. 爬取验证码图片数据
 2. 人工标注或半自动标注
-3. 使用 ResNet 训练分类模型
+3. 训练分类模型
 4. 导出为 NCNN 格式
 
 **训练数据集：**
@@ -26,9 +42,32 @@ SHMTU CAS OCR Server 使用 NCNN 格式的模型权重进行验证码识别。�
 
 训练代码中包含爬虫代码以及自动测试识别结果代码，你可以对其修改，对测试通过的图片进行标注，这样可以获得准确的标注。
 
+## 模型版本切换
+
+| 入口 | 说明 |
+|------|------|
+| `--model-version v1\|v2` | CLI 参数（默认 `v2`） |
+| `OCR_MODEL_VERSION` | 环境变量（默认 `v2`） |
+| HTTP 请求体 `version` 字段 | 运行时按次覆盖（`/api/ocr`、`/api/ocr/upload`） |
+
+示例：
+
+```bash
+# 启动时指定 v2（默认）
+./shmtu_cas_ocr_server --model-version v2
+
+# 启动时指定 v1
+./shmtu_cas_ocr_server --model-version v1
+
+# 启动后单次请求覆盖
+curl -X POST http://localhost:21600/api/ocr \
+  -H 'Content-Type: application/json' \
+  -d '{"imageBase64":"...","version":"v1"}'
+```
+
 ## 模型精度
 
-Server 支持两种模型精度，通过 `--precision` 参数或 `SHMTU_PRECISION` 环境变量选择：
+精度参数只对 v1 生效；v2 当前仅提供 fp16。
 
 | 精度 | 说明 | 适用场景 |
 |------|------|----------|
@@ -36,38 +75,35 @@ Server 支持两种模型精度，通过 `--precision` 参数或 `SHMTU_PRECISIO
 | `fp32` | 单精度浮点 | 兼容性最好，CPU 模式推荐使用 |
 
 ```bash
-# 使用 fp16 精度（默认）
-./shmtu_cas_ocr_server --precision fp16 --use-gpu
-
-# 使用 fp32 精度
-./shmtu_cas_ocr_server --precision fp32
-
-# 或通过环境变量
-SHMTU_PRECISION=fp16 ./shmtu_cas_ocr_server --use-gpu
+./shmtu_cas_ocr_server --model-version v1 --precision fp32
 ```
 
-::: tip
-Docker 环境下默认使用 `fp16` 精度。如果使用 CPU 版本，建议切换为 `fp32` 以获得更好的兼容性。
-:::
+## v2 模型目录结构（默认）
 
-## 模型目录结构
+v2 仅需 1 个模型（NCNN 三件套）：
 
-模型文件应放置在 `--model-dir` 指定的目录中，默认为 `./models`。
+```
+models/
+├── mobilenet_v3_small.trislot_decoder.v2_0.fp16.param
+├── mobilenet_v3_small.trislot_decoder.v2_0.fp16.bin
+```
 
-### 所需模型文件
+> 部分 backbone 还会附带 `.bin` 之外的元数据文件，请以 `model-assets.json` 清单为准。
 
-根据精度不同，需要的模型文件如下：
+## v1 模型目录结构
+
+v1 沿用旧的 6 文件结构：
 
 **fp16 精度（默认）：**
 
 ```
 models/
-├── resnet18_equal_symbol_latest.fp16.param    # 等号分类模型结构
-├── resnet18_equal_symbol_latest.fp16.bin      # 等号分类模型权重
-├── resnet18_operator_latest.fp16.param        # 运算符分类模型结构
-├── resnet18_operator_latest.fp16.bin          # 运算符分类模型权重
-├── resnet34_digit_latest.fp16.param           # 数字分类模型结构
-└── resnet34_digit_latest.fp16.bin             # 数字分类模型权重
+├── resnet18_equal_symbol_latest.fp16.param
+├── resnet18_equal_symbol_latest.fp16.bin
+├── resnet18_operator_latest.fp16.param
+├── resnet18_operator_latest.fp16.bin
+├── resnet34_digit_latest.fp16.param
+└── resnet34_digit_latest.fp16.bin
 ```
 
 **fp32 精度：**
@@ -96,18 +132,41 @@ Docker 容器启动时会自动检查模型文件是否存在。如果缺少任�
 
 ### 下载流程
 
-1. 检查 `MODEL_DIR` 中是否存在所有必需的模型文件
-2. 如果所有文件已存在，跳过下载
-3. 如果有缺失文件，从配置的源下载
-4. 主源下载失败时自动尝试备用源（GitHub 和 Gitee 互为备用）
-5. 每个文件最多重试 3 次
-6. 下载完成后验证 SHA256 校验和
+1. 读取启动配置中的 `OCR_MODEL_VERSION`（默认 `v2`）
+2. 检查 `MODEL_DIR` 中是否存在对应版本的全部必需文件
+3. 如果所有文件已存在，跳过下载
+4. 如果有缺失文件，从配置的源下载
+5. 主源下载失败时自动尝试备用源（GitHub 和 Gitee 互为备用）
+6. 每个文件最多重试 3 次
+7. **v1**：从 `SHA256SUMS.txt` 验证；**v2**：从 `model-assets.json` 的 hash 字段验证
 
-### SHA256 校验和验证
+### v1 校验
 
-模型下载脚本会自动从 Release 页面获取 `SHA256SUMS.txt` 文件，用于验证下载文件的完整性。如果校验失败，会删除损坏的文件并重试下载。
+v1 仍使用 `SHA256SUMS.txt` 校验文件完整性。如果校验失败，会删除损坏的文件并重试下载。
 
-如果 `SHA256SUMS.txt` 文件本身也无法下载，会跳过校验步骤，仅检查文件是否非空。
+### v2 校验（`model-assets.json`）
+
+v2 的资产清单文件位于 release 根目录，形如：
+
+```json
+{
+  "tag": "v2.0.2",
+  "assets": [
+    {
+      "name": "mobilenet_v3_small.trislot_decoder.v2_0.fp16.param",
+      "url": "...",
+      "sha256": "..."
+    },
+    {
+      "name": "mobilenet_v3_small.trislot_decoder.v2_0.fp16.bin",
+      "url": "...",
+      "sha256": "..."
+    }
+  ]
+}
+```
+
+下载脚本按 `{tag, backbone, precision, engine}` 维度在 manifest 中查找匹配资产，对应文件用清单内嵌的 `sha256` 字段校验。
 
 ### 相关环境变量
 
@@ -115,90 +174,70 @@ Docker 容器启动时会自动检查模型文件是否存在。如果缺少任�
 |----------|--------|------|
 | `SHMTU_MODEL_DIR` | `/app/models` | 模型文件目录 |
 | `SHMTU_MODEL_SOURCE` | `gitee` | 下载源：`gitee` 或 `github` |
-| `SHMTU_PRECISION` | `fp16` | 模型精度 |
+| `SHMTU_PRECISION` | `fp16` | 模型精度（v1 生效） |
 | `SHMTU_AUTO_DOWNLOAD_MODELS` | `1` | 是否自动下载缺失模型 |
 | `SHMTU_MODEL_BASE_URL` | GitHub Release URL | 主下载 URL |
 | `SHMTU_MODEL_FALLBACK_BASE_URL` | Gitee Release URL | 备用下载 URL |
+| `OCR_MODEL_VERSION` | `v2` | 模型版本（`v1` 或 `v2`） |
 
 ### 禁用自动下载
 
-在某些场景下（如只读挂载或安全要求），可以禁用自动下载：
-
 ```bash
-# 通过环境变量禁用
 docker run -d \
   -e SHMTU_AUTO_DOWNLOAD_MODELS=0 \
   -v ./models:/app/models:ro \
-  ... \
   a645162/shmtu-cas-ocr-server:latest-vulkan
 ```
 
-当 `SHMTU_AUTO_DOWNLOAD_MODELS=0` 时，如果模型文件缺失，容器会输出错误信息并退出，不会启动服务。
+当 `SHMTU_AUTO_DOWNLOAD_MODELS=0` 时，如果模型文件缺失，容器会输出错误信息并退出。
 
 ## Docker 环境下的模型管理
 
-### 自动下载模式（推荐）
+### 默认镜像（v2）
 
-容器启动时会自动从 Gitee 或 GitHub 下载模型权重到 `/app/models` 目录。下载源通过 `SHMTU_MODEL_SOURCE` 控制：
+`runtime-cpu` / `runtime-gpu` 默认目标**捆绑 v2 fp16 mobilenet_v3_small 单模型权重**。v2 仅 1 个模型（`.param` + `.bin`），相比 v1 的 6 文件结构，镜像体积更小。
 
-- `gitee`（默认）-- 国内用户推荐，下载速度快
-- `github` -- 国际网络环境使用
+### 内置模型镜像（bundled）
+
+bundled 镜像目前仅打包 v2；如需 v1 bundled 镜像请自行修改 Dockerfile 多阶段 COPY 段。
 
 ```bash
-# 使用 Gitee 源（默认）
-SHMTU_MODEL_SOURCE=gitee docker compose up -d
-
-# 使用 GitHub 源
-SHMTU_MODEL_SOURCE=github docker compose up -d
+# v2 bundled 镜像
+docker pull a645162/shmtu-cas-ocr-server:latest-vulkan-bundled
+docker build -f Dockerfile --target runtime-gpu-bundled -t shmtu-ocr-server:vulkan-bundled .
 ```
 
-由于 `docker-compose.yml` 默认配置了 `./models:/app/models` 卷映射，下载的模型会持久化到宿主机，后续重启无需重复下载。
-
-### 挂载本地模型
-
-如果已经提前下载了模型，可以挂载本地目录避免每次启动时下载：
+### 在 Docker 中使用 v1
 
 ```bash
-# 将模型文件放在宿主机 ./models 目录
+# 1. 准备 v1 模型目录
+mkdir -p ./models
+# 把 v1 6 个权重文件放入 ./models/
+
+# 2. 启动时显式指定 v1
 docker run -d \
+  -e OCR_MODEL_VERSION=v1 \
+  -e SHMTU_AUTO_DOWNLOAD_MODELS=0 \
   -v ./models:/app/models \
-  ... \
   a645162/shmtu-cas-ocr-server:latest-vulkan
 ```
 
-在 `docker-compose.yml` 中已默认配置：
+或在 `docker-compose.yml` 中：
 
 ```yaml
+environment:
+  OCR_MODEL_VERSION: v1
+  SHMTU_AUTO_DOWNLOAD_MODELS: 0
 volumes:
   - ./models:/app/models
 ```
 
-### 内置模型镜像
-
-项目提供了 bundled 版本的 Docker 镜像，模型权重直接打包在镜像中：
-
-```bash
-# 拉取内置模型的 GPU 版本
-docker pull a645162/shmtu-cas-ocr-server:latest-vulkan-bundled
-
-# 或构建内置模型镜像
-docker build -f Dockerfile --target runtime-gpu-bundled -t shmtu-ocr-server:vulkan-bundled .
-```
-
-这种方式适合离线环境部署，但镜像体积会更大。
-
 ## NCNN 预编译包
 
-在 Linux 下从源码构建时，项目会优先探测 `3rdparty/NCNN/` 目录下的 NCNN 预编译包。可以使用脚本自动下载：
+在 Linux 下从源码构建时，项目会优先探测 `3rdparty/NCNN/` 目录下的 NCNN 预编译包：
 
 ```bash
-# 默认下载最新版 Ubuntu 24.04 预编译包
 python3 3rdparty/NCNN/download_ncnn.py
-
-# 交互式选择系统版本
-python3 3rdparty/NCNN/download_ncnn.py --interactive
-
-# 指定版本
 python3 3rdparty/NCNN/download_ncnn.py --tag 20260526 --ubuntu 2404
 ```
 
@@ -214,15 +253,10 @@ NCNN 搜索路径优先级：
 
 ## 模型更新
 
-更新模型时只需替换 `models/` 目录中的文件，然后重启服务即可：
+更新模型时只需替换 `models/` 目录中的文件，然后重启服务：
 
 ```bash
-# Docker 环境
 docker compose restart
-
-# 原生环境
-# 停止当前服务后重新启动
-./shmtu_cas_ocr_server --model-dir ./models --use-gpu
 ```
 
 服务启动后会自动加载新模型，无需额外操作。
@@ -231,11 +265,12 @@ docker compose restart
 
 ## 使用下载脚本
 
-项目提供了 Python 模型下载脚本，可用于在宿主机上预先下载模型：
-
 ```bash
-# 下载模型到默认目录
+# 默认下载 v2（推荐）
 python3 scripts/download_models.py
+
+# 下载 v1
+python3 scripts/download_models.py --version v1
 ```
 
 该脚本会在 Docker 构建和 CI 流程中使用，也可在本地运行。

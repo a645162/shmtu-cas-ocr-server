@@ -85,6 +85,7 @@ services:
       SHMTU_NCNN_THREADS: ${SHMTU_NCNN_THREADS:-0}
       SHMTU_SERVER_NAME: ${SHMTU_SERVER_NAME:-}
       SHMTU_MODEL_SOURCE: ${SHMTU_MODEL_SOURCE:-gitee}
+      OCR_MODEL_VERSION: ${OCR_MODEL_VERSION:-v2}
     healthcheck:
       test: ["CMD", "curl", "-fsS", "http://127.0.0.1:21600/api/health"]
       interval: 30s
@@ -210,7 +211,7 @@ docker run -d \
 
 ### 使用 Bundled 镜像
 
-使用内置模型的镜像无需挂载模型目录：
+使用内置模型的镜像无需挂载模型目录，**默认捆绑 v2 fp16 mobilenet_v3_small 单模型**：
 
 ```bash
 docker run -d \
@@ -219,6 +220,8 @@ docker run -d \
   -p 21601:21601 \
   a645162/shmtu-cas-ocr-server:latest-vulkan-bundled
 ```
+
+> bundled 镜像目前仅打包 v2。如需 v1 bundled 镜像，请自行修改 `Dockerfile` 多阶段 COPY 段，或改用普通镜像 + 挂载本地 v1 权重目录。
 
 ## 环境变量配置
 
@@ -233,8 +236,9 @@ docker run -d \
 | `SHMTU_QUEUE_CAPACITY` | `0` | 最大排队请求数（0=自动） |
 | `SHMTU_MODEL_DIR` | `/app/models` | 模型文件目录 |
 | `SHMTU_MODEL_SOURCE` | `gitee` | 模型下载源（`gitee` 或 `github`） |
-| `SHMTU_PRECISION` | `fp16` | 模型精度（`fp16` 或 `fp32`） |
+| `SHMTU_PRECISION` | `fp16` | 模型精度（`fp16` 或 `fp32`，v1 生效） |
 | `SHMTU_AUTO_DOWNLOAD_MODELS` | `1` | 是否自动下载缺失模型（`0` 或 `1`） |
+| `OCR_MODEL_VERSION` | `v2` | 模型版本（`v1` 或 `v2`） |
 | `SHMTU_LOG_DIR` | `/app/logs` | 日志目录 |
 | `SHMTU_LOG_FILE` | `/app/logs/shmtu-cas-ocr-server.log` | 日志文件路径 |
 | `SHMTU_SERVER_NAME` | (空) | 服务名称，显示在 /api/health |
@@ -267,6 +271,9 @@ SHMTU_NCNN_THREADS=0
 
 # 模型引导源
 SHMTU_MODEL_SOURCE=gitee
+
+# 模型版本（v1 = 3 模型 ResNet；v2 = 单模型 MobileNetV3 Tri-Slot Decoder，默认）
+OCR_MODEL_VERSION=v2
 
 # 容器日志路径
 SHMTU_LOG_FILE=/app/logs/shmtu-cas-ocr-server.log

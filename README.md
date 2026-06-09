@@ -6,7 +6,42 @@ ShangHai Maritime University CAS OCR Server
 
 ## 模型权重
 
-请前往[shmtu-cas-ocr-model](https://github.com/a645162/shmtu-cas-ocr-model)项目的[Github Release](https://github.com/a645162/shmtu-cas-ocr-model/releases)中下载NCNN版权重。
+请前往[shmtu-cas-ocr-model](https://github.com/a645162/shmtu-cas-ocr-model)项目的[Github Release](https://github.com/a645162/shmtu-cas-ocr-model/releases)中下载模型。
+
+### v1 / v2 模型
+
+本服务同时支持 v1（legacy，3 个独立 ResNet 模型）与 v2（**默认**，单模型 MobileNetV3 Tri-Slot Decoder）。
+
+| 版本 | 模型数量 | 默认 backbone | 精度 | 输入 | Tag |
+|---|---|---|---|---|---|
+| v1 | 3 | resnet18 / resnet34 | fp16 / fp32 | RGB 3×224×224 | `v1.0-NCNN` |
+| **v2** | **1** | `mobilenet_v3_small` | fp16 | 灰度 1×64×192 | `v2.0.x` |
+
+切换方式：
+
+```bash
+# CLI：默认 v2
+./shmtu_cas_ocr_server --model-version v2
+
+# 切换到 v1
+./shmtu_cas_ocr_server --model-version v1
+```
+
+环境变量：
+
+```bash
+export OCR_MODEL_VERSION=v1   # 或 v2 (默认)
+```
+
+请求级覆盖（HTTP `POST /api/ocr`）：
+
+```json
+{ "imageBase64": "...", "version": "v1" }
+```
+
+下载脚本默认拉取 v2 fp16 mobilenet_v3_small；如需 v1 可使用 `scripts/download_models.py --version v1`。详细说明见 [Documents/docs/guide/model-management.md](Documents/docs/guide/model-management.md)。
+
+### NCNN 预编译包
 
 Ubuntu 下如果使用 Tencent 官方预编译版 ncnn，可运行：
 

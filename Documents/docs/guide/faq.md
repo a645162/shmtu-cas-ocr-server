@@ -216,6 +216,43 @@ watch -n 5 'curl -s http://localhost:21600/api/status | python3 -m json.tool'
 | `busy` | 排队请求数 > 队列容量/2 |
 | `unavailable` | 模型未加载 |
 
+## 模型版本相关
+
+### Q: v1 和 v2 模型有什么区别？该选哪个？
+
+v2 是**默认推荐**：单模型 MobileNetV3 Tri-Slot Decoder，整图端到端 1 次推理，速度更快、镜像更小、下载文件更少。v1 保留仅为兼容老用户（3 个独立 ResNet 模型，需要先判等号样式再算子）。
+
+新部署直接使用 v2。如需在两者间切换，详见 [模型管理](/guide/model-management#模型版本切换)。
+
+### Q: 如何切换 v1 / v2？
+
+启动时通过 CLI 参数或环境变量：
+
+```bash
+./shmtu_cas_ocr_server --model-version v1
+OCR_MODEL_VERSION=v2 ./shmtu_cas_ocr_server
+```
+
+或运行时按次请求覆盖：
+
+```bash
+curl -X POST http://localhost:21600/api/ocr \
+  -H 'Content-Type: application/json' \
+  -d '{"imageBase64":"...", "version":"v1"}'
+```
+
+### Q: v2 模型的下载机制和 v1 一样吗？
+
+不一样。v2 通过 release 根目录的 `model-assets.json` 清单（按 tag + backbone + precision + engine 维度）智能匹配资产并用清单内嵌的 hash 校验；v1 沿用旧的硬编码 6 文件列表 + `SHA256SUMS.txt` 校验。
+
+### Q: Docker 镜像默认捆绑哪个版本？
+
+`runtime-cpu` / `runtime-gpu` 默认目标**捆绑 v2 fp16 mobilenet_v3_small**（单模型，体积更小）。bundled 镜像也仅打包 v2。如需 v1，请使用普通镜像 + 挂载本地 `./models/` 目录（包含 6 个 v1 权重文件）并设 `OCR_MODEL_VERSION=v1`。
+
+### Q: `--precision` 在 v2 下还有效吗？
+
+`--precision` 只对 v1 生效；v2 当前仅提供 fp16 精度。如果误传 `--precision fp32` 但 `--model-version v2`，会输出 WARNING 并忽略精度参数。
+
 ## 其他
 
 ### Q: 这个项目可以用于商业用途吗？

@@ -95,13 +95,14 @@ POST /api/ocr
 Content-Type: application/json
 ```
 
-通过 JSON Body 传入 Base64 编码的验证码图片进行识别。
+通过 JSON Body 传入 Base64 编码的验证码图片进行识别。可选 `version` 字段在请求级别覆盖默认模型版本（`v1` / `v2`）。
 
 **请求体：**
 
 ```json
 {
-  "imageBase64": "<base64 编码的图片数据>"
+  "imageBase64": "<base64 编码的图片数据>",
+  "version": "v2"
 }
 ```
 

@@ -34,9 +34,13 @@ SHMTU CAS OCR Server 支持三种配置方式，按优先级从低到高为：
 | 参数 | 环境变量 | 默认值 | 说明 |
 |------|----------|--------|------|
 | `--model-dir` | `SHMTU_MODEL_DIR` | `./models` | 模型文件目录路径 |
-| `--precision` | `SHMTU_PRECISION` | `fp16` | 模型精度：`fp16` 或 `fp32` |
+| `--model-version` | `OCR_MODEL_VERSION` | `v2` | 模型版本：`v1` 或 `v2` |
+| `--precision` | `SHMTU_PRECISION` | `fp16` | 模型精度：`fp16` 或 `fp32`（v1 生效） |
 
 `--precision` 只接受 `fp16` 和 `fp32` 两个值，其他值会导致启动失败。
+`--model-version` 接受 `v1` / `v2`，未知值回退到 `v2`。
+
+HTTP 请求体内的 `version` 字段可在运行时按次覆盖（见 [API 接口](/guide/api)）。
 
 ### 并发配置
 
@@ -141,10 +145,11 @@ environment:
 | 环境变量 | 默认值 | 说明 |
 |----------|--------|------|
 | `SHMTU_MODEL_SOURCE` | `gitee` | 模型下载源（`gitee` 或 `github`） |
-| `SHMTU_PRECISION` | `fp16` | 模型精度（`fp16` 或 `fp32`） |
+| `SHMTU_PRECISION` | `fp16` | 模型精度（`fp16` 或 `fp32`，v1 生效） |
 | `SHMTU_AUTO_DOWNLOAD_MODELS` | `1` | 是否自动下载缺失模型（`0` 或 `1`） |
 | `SHMTU_MODEL_BASE_URL` | GitHub Release URL | 模型下载主 URL |
 | `SHMTU_MODEL_FALLBACK_BASE_URL` | Gitee Release URL | 模型下载备用 URL |
+| `OCR_MODEL_VERSION` | `v2` | 模型版本（`v1` 或 `v2`） |
 
 ## 配置示例
 
@@ -212,6 +217,7 @@ Configuration:
   TCP host:       0.0.0.0
   TCP port:       21601
   Model dir:      ./models
+  Model version:  v2
   Precision:      fp16
   Workers:        2
   NCNN threads:   1
