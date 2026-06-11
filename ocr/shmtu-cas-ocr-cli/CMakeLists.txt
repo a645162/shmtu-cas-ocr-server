@@ -13,6 +13,9 @@ endif()
 # cpp-httplib requires threading
 find_package(Threads REQUIRED)
 
+# curl is required for v2 model downloads (shared with GUI's model_download.cpp)
+find_package(CURL REQUIRED)
+
 # Optional: OpenSSL for HTTPS support in cpp-httplib
 find_package(OpenSSL QUIET)
 if(OpenSSL_FOUND)
@@ -31,6 +34,12 @@ set(CLI_SOURCES
     src/cli_remote.cpp
     src/cli_runner.cpp
     src/main.cpp
+    # Reuse model_download.cpp + logging.cpp for v2 download infrastructure.
+    # Both files are self-contained (no Qt6 dependency) so they can be
+    # compiled into any target.  The GUI executable also compiles them;
+    # that's fine because the two are independent binaries.
+    ${CMAKE_SOURCE_DIR}/ocr/shmtu-cas-ocr-gui/src/model_download.cpp
+    ${CMAKE_SOURCE_DIR}/ocr/shmtu-cas-ocr-gui/src/logging.cpp
 )
 
 # --------------------------------------------------------------------------
@@ -47,6 +56,7 @@ target_include_directories(shmtu_cas_ocr_cli
     PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/src
         ${CMAKE_SOURCE_DIR}/3rdparty/cpp-httplib
+        ${CMAKE_SOURCE_DIR}/ocr/shmtu-cas-ocr-gui/include
 )
 
 target_link_libraries(shmtu_cas_ocr_cli
@@ -54,6 +64,7 @@ target_link_libraries(shmtu_cas_ocr_cli
         SHMTU::CasOcrLib
         CLI11::CLI11
         Threads::Threads
+        CURL::libcurl
 )
 
 if(OpenSSL_FOUND)

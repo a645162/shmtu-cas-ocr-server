@@ -29,6 +29,8 @@ struct CliConfig {
     std::string precision = "fp16";
     bool use_gpu = false;
     shmtu::cas::ocr::ModelVersion model_version = shmtu::cas::ocr::ModelVersion::V2;
+    std::string v2_tag;       // e.g. "v2.0.5"
+    std::string v2_backbone;  // e.g. "mobilenet_v3_small"
     bool json_output = false;
     std::string input_path;
     std::string server_host;

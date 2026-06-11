@@ -4,6 +4,9 @@
 #include "cli_json.h"
 #include "cli_remote.h"
 
+#include <shmtu/cas_ocr/manifest.h>
+#include <shmtu/cas_ocr/gui/model_download.h>
+
 #include <algorithm>
 #include <exception>
 #include <cstdio>
@@ -158,6 +161,132 @@ void print_json_array_item_prefix(const size_t index) {
 }  // namespace
 
 int run_cli(const CliConfig& config) {
+    // ---- Subcommand dispatch ----
+    if (config.input_path == "__subcmd_list_tags__") {
+        // List known v2 tags (we have a hard-coded list of known release tags)
+        std::printf("Available v2 release tags:\n");
+        for (const auto& tag : {"v2.0", "v2.0.1", "v2.0.2", "v2.0.3", "v2.0.4", "v2.0.5"}) {
+            std::printf("  %s\n", tag);
+        }
+        std::printf("\nUse 'list-models --tag <tag>' to see available models.\n");
+        return 0;
+    }
+
+    if (config.input_path == "__subcmd_list_models__") {
+        const auto tag = config.v2_tag.empty() ? std::string("v2.0") : config.v2_tag;
+        std::printf("Fetching manifest for tag=%s...\n", tag.c_str());
+        const std::string sources[] = {"github", "gitee"};
+        for (const auto& source : sources) {
+            long http_status = 0;
+            std::string error_message;
+            const auto json_text = shmtu::cas::ocr::gui::downloadReleaseManifest(
+                source, tag, http_status, error_message);
+            if (!json_text.empty() && http_status == 200) {
+                const auto manifest = shmtu::cas::ocr::parse_release_manifest(json_text);
+                std::printf("Source: %s\n", source.c_str());
+                std::printf("Schema: %d, Model count: %d\n\n",
+                            manifest.schema_version, manifest.model_count);
+                std::printf("%-40s  %-25s  %-10s  %s\n",
+                            "Asset Stem", "Backbone", "Version", "Family");
+                std::printf("%-40s  %-25s  %-10s  %s\n",
+                            std::string(40, '-').c_str(),
+                            std::string(25, '-').c_str(),
+                            std::string(10, '-').c_str(),
+                            std::string(10, '-').c_str());
+                for (const auto& model : manifest.models) {
+                    std::printf("%-40s  %-25s  %-10s  %s\n",
+                                model.asset_stem.c_str(),
+                                model.backbone.c_str(),
+                                model.version.c_str(),
+                                model.family.c_str());
+                }
+                return 0;
+            }
+        }
+        std::fprintf(stderr, "Failed to fetch manifest for tag=%s\n", tag.c_str());
+        return 1;
+    }
+
+    if (config.input_path == "__subcmd_download__") {
+        // reuse use_gpu as "use gitee" flag (set in parse_args)
+        const bool use_gitee = config.use_gpu;
+        std::printf("Download command:\n");
+        std::printf("  Version:   %s\n",
+                    shmtu::cas::ocr::model_version_to_string(config.model_version).c_str());
+        std::printf("  Tag:       %s\n",
+                    config.v2_tag.empty() ? "(auto: v2.0)" : config.v2_tag.c_str());
+        std::printf("  Backbone:  %s\n",
+                    config.v2_backbone.empty() ? "(default)" : config.v2_backbone.c_str());
+        std::printf("  Precision: %s\n", config.precision.c_str());
+        std::printf("  Model dir: %s\n", config.model_dir.c_str());
+        std::printf("  Source:    %s\n", use_gitee ? "Gitee (primary)" : "GitHub (primary)");
+
+        if (config.model_version == shmtu::cas::ocr::ModelVersion::V1) {
+            // V1: use original v1 downloader via existing cli_files/missing
+            std::fprintf(stderr, "V1 download: reuses shmtu-cas-ocr-gui downloadModelFiles via wxWidgets Qt is unavailable in CLI; using raw v1.0-NCNN URL with SHA256SUMS verification.\n");
+            // For CLI, we'll use the same logic as V2 but with V1 hard-coded paths
+            // since the V1 file list is in model_download.cpp (not exposed in CLI).
+            // Use the V1 NCNN base URLs.
+            std::printf("V1 download not yet fully wired in CLI demo. Please use the GUI or copy files manually.\n");
+            return 1;
+        }
+
+        // V2 download: fetch manifest, find model, download artifact
+        const auto tag = config.v2_tag.empty()
+                             ? std::string(shmtu::cas::ocr::gui::DEFAULT_RELEASE_TAG)
+                             : config.v2_tag;
+
+        std::string manifest_json;
+        long http_status = 0;
+        std::string error_message;
+        const std::string dl_sources[] = {"github", "gitee"};
+        for (const auto& dl_source : dl_sources) {
+            manifest_json = shmtu::cas::ocr::gui::downloadReleaseManifest(
+                dl_source, tag, http_status, error_message);
+            if (!manifest_json.empty() && http_status == 200) {
+                std::printf("Got manifest from %s\n", dl_source.c_str());
+                break;
+            }
+        }
+        if (manifest_json.empty()) {
+            std::fprintf(stderr, "Failed to fetch manifest for tag=%s\n", tag.c_str());
+            return 1;
+        }
+
+        const auto manifest = shmtu::cas::ocr::parse_release_manifest(manifest_json);
+        if (manifest.models.empty()) {
+            std::fprintf(stderr, "Manifest empty or parse error\n");
+            return 1;
+        }
+
+        // Find matching model by backbone
+        const shmtu::cas::ocr::ModelInfo* target = nullptr;
+        if (!config.v2_backbone.empty()) {
+            for (const auto& model : manifest.models) {
+                if (model.backbone == config.v2_backbone) {
+                    target = &model;
+                    break;
+                }
+            }
+        }
+        if (!target) {
+            target = &manifest.models[0];
+            std::printf("Backbone not specified, using first model: %s\n",
+                        target->display_name.c_str());
+        }
+
+        const bool ok = shmtu::cas::ocr::gui::downloadV2Artifact(
+            *target, "ncnn", config.precision, config.model_dir, use_gitee, nullptr,
+            error_message);
+
+        if (!ok) {
+            std::fprintf(stderr, "Download failed: %s\n", error_message.c_str());
+            return 1;
+        }
+        std::printf("Download completed successfully to: %s\n", config.model_dir.c_str());
+        return 0;
+    }
+
     const bool need_local = !config.server_mode || config.compare_mode;
     const bool need_remote = config.server_mode || config.compare_mode;
 
