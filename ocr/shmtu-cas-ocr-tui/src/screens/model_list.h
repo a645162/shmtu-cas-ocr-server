@@ -41,6 +41,12 @@ public:
         return models_;
     }
 
+    // Standard container iteration.
+    auto begin() const { return models_.begin(); }
+    auto end() const { return models_.end(); }
+    auto cbegin() const { return models_.cbegin(); }
+    auto cend() const { return models_.cend(); }
+
     // Render the full FTXUI element tree for this screen.
     ftxui::Element Render();
     ftxui::Component component();
