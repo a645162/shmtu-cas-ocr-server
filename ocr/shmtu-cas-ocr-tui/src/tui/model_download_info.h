@@ -1,11 +1,10 @@
 // SPDX-License-Identifier: MIT
-
-
 #pragma once
 
 #include <shmtu/cas_ocr/types.h>
 
 #include <string>
+#include <string_view>
 #include <vector>
 
 namespace shmtu::cas::ocr::tui {
