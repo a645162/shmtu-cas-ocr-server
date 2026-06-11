@@ -74,6 +74,7 @@ ftxui::Element TagListScreen::Render() {
             oss << r.tag;
             if (r.prerelease) oss << "  [pre]";
             if (r.draft) oss << "  [draft]";
+            if (r.model_count >= 0) oss << "  (" << r.model_count << " models)";
             entries.push_back(oss.str());
         }
         auto menu = ftxui::Menu(&entries, &selected_);

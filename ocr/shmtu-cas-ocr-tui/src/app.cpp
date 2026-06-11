@@ -164,6 +164,19 @@ void App::startRefreshWorker() {
         } else if (releases.empty()) {
             setStatus("GitHub returned no v2 releases.");
         } else {
+            // Fetch manifest summaries to populate model_count for each tag.
+            for (auto& r : releases) {
+                long ms = 0;
+                std::string me;
+                std::string body = github_.fetchManifestJson(r.tag, ms, me);
+                if (ms == 200 && !body.empty()) {
+                    auto summary = shmtu::cas::ocr::parse_release_manifest_summary(
+                        r.tag, body);
+                    r.model_count = summary.model_count;
+                } else {
+                    r.model_count = -1;  // unavailable
+                }
+            }
             setStatus("Loaded " + std::to_string(releases.size()) +
                       " release(s).");
         }

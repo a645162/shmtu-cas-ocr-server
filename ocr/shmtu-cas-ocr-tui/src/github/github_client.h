@@ -1,6 +1,4 @@
 // SPDX-License-Identifier: MIT
-
-
 #pragma once
 
 #include <string>
@@ -20,6 +18,7 @@ struct ReleaseSummary {
     bool prerelease = false;
     bool draft = false;
     std::string html_url;     // optional
+    int model_count = -1;     // -1 = not yet fetched; populated later via manifest
 };
 
 // GitHub/Gitee API client used by the TUI.

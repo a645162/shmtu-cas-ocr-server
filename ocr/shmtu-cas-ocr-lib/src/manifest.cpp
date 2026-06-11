@@ -457,4 +457,33 @@ std::string infer_asset_stem_from_dir(const std::string& model_dir) {
     return {};
 }
 
+ReleaseManifestSummary parse_release_manifest_summary(
+    std::string_view tag, std::string_view json_text) {
+    ReleaseManifestSummary summary;
+    summary.tag = std::string(tag);
+    summary.model_count = 0;
+
+    // Walk the JSON looking for "model_count": <int>
+    auto findCount = [](std::string_view json) -> int {
+        const std::string needle = "\"model_count\"";
+        auto pos = json.find(needle);
+        if (pos == std::string_view::npos) return 0;
+        pos = json.find(':', pos + needle.size());
+        if (pos == std::string_view::npos) return 0;
+        ++pos;
+        while (pos < json.size() && std::isspace(static_cast<unsigned char>(json[pos])))
+            ++pos;
+        if (pos >= json.size()) return 0;
+        int count = 0;
+        while (pos < json.size() && std::isdigit(static_cast<unsigned char>(json[pos]))) {
+            count = count * 10 + (json[pos] - '0');
+            ++pos;
+        }
+        return count;
+    };
+
+    summary.model_count = findCount(json_text);
+    return summary;
+}
+
 }  // namespace shmtu::cas::ocr

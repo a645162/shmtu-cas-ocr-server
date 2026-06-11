@@ -23,6 +23,15 @@ namespace shmtu::cas::ocr {
 // array so older releases still produce a populated manifest.
 // --------------------------------------------------------------------------
 
+// Lightweight summary returned by `parse_release_manifest_summary`.  Only
+// extracts `model_count` from a manifest JSON blob without parsing the
+// full model tree.  Used when the caller only needs to know how many
+// models a release contains (e.g. a release-tag list view).
+struct ReleaseManifestSummary {
+    std::string tag;       // the release tag, e.g. "v2.0.1"
+    int model_count = 0;   // number of `ModelInfo` entries, 0 on parse error
+};
+
 // Parse a release manifest from its raw JSON text.
 // Returns a manifest whose `models` array is populated for schema_version
 // >= 2 (preferred path); for older schemas the same data lands in
@@ -50,5 +59,14 @@ std::vector<const ModelInfo*> list_models(const ReleaseManifest& manifest);
 // `mobilenet_v3_small.trislot_decoder.v2_0` stem.  Returns an empty
 // string if no candidate is present in `model_dir`.
 std::string infer_asset_stem_from_dir(const std::string& model_dir);
+
+// Parse only `model_count` from a manifest JSON blob.  This is a
+// low-overhead alternative to `parse_release_manifest` when the
+// caller does not need the per-model details.  The returned summary
+// carries the tag that was passed in (for bookkeeping) and the
+// model count extracted from the JSON.  On parse failure,
+// `model_count` is 0.
+ReleaseManifestSummary parse_release_manifest_summary(
+    std::string_view tag, std::string_view json_text);
 
 } // namespace shmtu::cas::ocr
