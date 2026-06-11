@@ -294,7 +294,9 @@ void App::startDownloadWorker(int model_index, const std::string& engine,
         useGiteeFromEnv() ? "gitee" : "github", tag,
         artifact->files.front().release_asset_name);
     const std::string dest =
-        GitHubClient::defaultAssetCacheDir(tag, model->asset_stem);
+        model_dir_.empty()
+            ? GitHubClient::defaultAssetCacheDir(tag, model->asset_stem)
+            : model_dir_;
 
     if (download_worker_.joinable()) {
         download_worker_.join();

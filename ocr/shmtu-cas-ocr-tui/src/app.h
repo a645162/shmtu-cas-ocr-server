@@ -1,6 +1,4 @@
 // SPDX-License-Identifier: MIT
-
-
 #pragma once
 
 #include "github/github_client.h"
@@ -32,6 +30,11 @@ public:
     App();
     ~App();
 
+    // Optionally override the cache directory used for downloaded assets.
+    // When non-empty, `startDownloadWorker` prefers it over
+    // `GitHubClient::defaultAssetCacheDir`.
+    void setModelDir(const std::string& dir) { model_dir_ = dir; }
+
     // Run the FTXUI event loop.  Returns the process exit code.
     int run();
 
@@ -59,6 +62,7 @@ private:
 
     GitHubClient github_;
     HttpClient http_;
+    std::string model_dir_;
 
     // -- UI plumbing ----------------------------------------------------
     ftxui::ScreenInteractive screen_ = ftxui::ScreenInteractive::Fullscreen();

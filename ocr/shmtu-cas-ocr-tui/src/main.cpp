@@ -41,6 +41,7 @@ void printUsage(const char* argv0) {
 }  // namespace
 
 int main(int argc, char* argv[]) {
+    std::string model_dir;
     for (int i = 1; i < argc; ++i) {
         if (std::strcmp(argv[i], "--help") == 0 ||
             std::strcmp(argv[i], "-h") == 0) {
@@ -55,8 +56,15 @@ int main(int argc, char* argv[]) {
                          SHMTU_CAS_OCR_VERSION);
             return 0;
         }
+        if (std::strcmp(argv[i], "--model-dir") == 0 && i + 1 < argc) {
+            model_dir = argv[++i];
+            continue;
+        }
     }
 
     shmtu::cas::ocr::tui::App app;
+    if (!model_dir.empty()) {
+        app.setModelDir(model_dir);
+    }
     return app.run();
 }
