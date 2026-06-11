@@ -13,6 +13,7 @@ vcpkg_installed/
 !docker-runtime/
 !docker-runtime/shmtu_cas_ocr_server
 !docker-runtime/shmtu_cas_ocr_cli
+!docker-runtime/shmtu_cas_ocr_tui
 
 # IDE
 .idea/
