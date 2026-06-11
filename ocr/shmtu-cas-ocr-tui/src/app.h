@@ -14,9 +14,7 @@
 #include <ftxui/component/screen_interactive.hpp>
 #include <ftxui/dom/elements.hpp>
 
-#include <memory>
 #include <mutex>
-#include <optional>
 #include <string>
 #include <thread>
 
