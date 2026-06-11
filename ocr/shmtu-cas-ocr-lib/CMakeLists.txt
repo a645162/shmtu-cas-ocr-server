@@ -11,9 +11,13 @@ find_package(ncnn REQUIRED)
 # --------------------------------------------------------------------------
 # Sources — core OCR (always compiled)
 # --------------------------------------------------------------------------
+find_package(CURL REQUIRED)
+
 set(LIB_SOURCES
     src/base64.cpp
     src/cas_ocr.cpp
+    src/curl_util.cpp
+    src/manifest.cpp
     src/v1_engine.cpp
     src/v2_engine.cpp
 )
@@ -21,6 +25,8 @@ set(LIB_SOURCES
 set(LIB_HEADERS_PUBLIC
     include/shmtu/cas_ocr/base64.h
     include/shmtu/cas_ocr/cas_ocr.h
+    include/shmtu/cas_ocr/curl_util.h
+    include/shmtu/cas_ocr/manifest.h
     include/shmtu/cas_ocr/types.h
     ${CMAKE_CURRENT_BINARY_DIR}/generated/include/shmtu/cas_ocr/version.h
 )
@@ -56,6 +62,7 @@ target_link_libraries(shmtu_cas_ocr_lib
     PUBLIC
         ${OpenCV_LIBS}
         ncnn
+        CURL::libcurl
 )
 
 target_compile_definitions(shmtu_cas_ocr_lib

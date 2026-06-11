@@ -16,7 +16,8 @@
     "ncnn",
     "glog",
     "drogon",
-    "trantor"
+    "trantor",
+    "ftxui"
   ],
   "features": {
     "vulkan": {

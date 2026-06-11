@@ -1,3 +1,4 @@
+#include <shmtu/cas_ocr/curl_util.h>
 #include <shmtu/cas_ocr/gui/model_download.h>
 
 #include <shmtu/cas_ocr/gui/logging.h>
@@ -173,9 +174,10 @@ std::unordered_map<std::string, std::string> fetchChecksums(const std::string& b
     long http_status = 0;
     std::string error_message;
 
-    const bool ok = curlDownload(url, curlWriteToVector, &data, nullptr, 30L,
-                                 http_status, error_message);
-    if (!ok || http_status != 200 || data.empty()) {
+    const bool ok = shmtu::cas::ocr::curlutil::downloadUrlToMemory(
+                        url, data, http_status, error_message) &&
+                    http_status == 200 && !data.empty();
+    if (!ok) {
         logMessage("fetchChecksums: failed to download SHA256SUMS.txt, url=" + url);
         return checksums;
     }
@@ -295,7 +297,7 @@ bool downloadModelFiles(const std::string& model_dir,
 
                 logMessage("downloadModelFiles: requesting " + url +
                            ", attempt=" + std::to_string(attempt));
-                const bool ok = downloadUrlToFile(url, filepath, http_status, curl_error);
+                const bool ok = shmtu::cas::ocr::curlutil::downloadUrlToFile(url, filepath, http_status, curl_error);
                 if (!ok || http_status != 200) {
                     std::error_code ec;
                     std::filesystem::remove(filepath, ec);
@@ -366,8 +368,8 @@ bool downloadUrlToMemory(const std::string& url,
                          long& http_status,
                          std::string& error_message) {
     output.clear();
-    const bool ok = curlDownload(url, curlWriteToVector, &output, nullptr, 30L,
-                                 http_status, error_message);
+    const bool ok = shmtu::cas::ocr::curlutil::downloadUrlToMemory(
+                        url, output, http_status, error_message);
     {
         std::ostringstream oss;
         oss << "downloadUrlToMemory: completed"

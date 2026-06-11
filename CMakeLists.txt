@@ -15,6 +15,7 @@ project(shmtu-cas-cpp VERSION ${SHMTU_CAS_VERSION} LANGUAGES CXX)
 set(SHMTU_CAS_LIB_VERSION    "${PROJECT_VERSION}")
 set(SHMTU_CAS_SERVER_VERSION "${PROJECT_VERSION}")
 set(SHMTU_CAS_CLI_VERSION    "${PROJECT_VERSION}")
+set(SHMTU_CAS_TUI_VERSION    "${PROJECT_VERSION}")
 set(SHMTU_CAS_GUI_VERSION    "${PROJECT_VERSION}")
 set(SHMTU_CAS_LIB_SOVERSION  "${PROJECT_VERSION_MAJOR}")
 
@@ -26,6 +27,7 @@ include(ShmtuVersion)
 # --------------------------------------------------------------------------
 option(BUILD_SERVER "Build the HTTP/TCP server executable" ON)
 option(BUILD_CLI    "Build the CLI tool executable" ON)
+option(BUILD_TUI    "Build the interactive TUI tool" OFF)
 option(BUILD_GUI    "Build the GUI application" OFF)
 option(USE_VULKAN   "Enable Vulkan/GPU support via ncnn" OFF)
 option(BUILD_SHARED_LIBS "Build shared libraries" OFF)
@@ -56,12 +58,14 @@ message(STATUS "SHMTU_CAS_OCR version: ${PROJECT_VERSION}")
 message(STATUS "  lib:    ${SHMTU_CAS_LIB_VERSION}")
 message(STATUS "  server: ${SHMTU_CAS_SERVER_VERSION}")
 message(STATUS "  cli:    ${SHMTU_CAS_CLI_VERSION}")
+message(STATUS "  tui:    ${SHMTU_CAS_TUI_VERSION}")
 message(STATUS "  gui:    ${SHMTU_CAS_GUI_VERSION}")
 message(STATUS "System: ${CMAKE_SYSTEM_NAME}")
 message(STATUS "C++ standard: C++${CMAKE_CXX_STANDARD}")
 message(STATUS "Build shared libraries: ${BUILD_SHARED_LIBS}")
 message(STATUS "Build server: ${BUILD_SERVER}")
 message(STATUS "Build CLI:    ${BUILD_CLI}")
+message(STATUS "Build TUI:    ${BUILD_TUI}")
 message(STATUS "Build GUI:    ${BUILD_GUI}")
 message(STATUS "Use Vulkan:   ${USE_VULKAN}")
 
@@ -177,6 +181,21 @@ if(BUILD_CLI)
     add_subdirectory(ocr/shmtu-cas-ocr-cli)
 endif()
 
+set(SHMTU_CAN_BUILD_TUI FALSE)
+if(BUILD_TUI AND EXISTS "${CMAKE_SOURCE_DIR}/ocr/shmtu-cas-ocr-tui/CMakeLists.txt")
+    find_package(ftxui CONFIG QUIET)
+    if(ftxui_FOUND)
+        set(SHMTU_CAN_BUILD_TUI TRUE)
+        message(STATUS "ftxui found: TUI target enabled")
+    else()
+        message(STATUS "ftxui not found: skipping ocr/shmtu-cas-ocr-tui")
+    endif()
+endif()
+
+if(SHMTU_CAN_BUILD_TUI)
+    add_subdirectory(ocr/shmtu-cas-ocr-tui)
+endif()
+
 if(SHMTU_CAN_BUILD_GUI)
     add_subdirectory(ocr/shmtu-cas-ocr-gui)
 endif()
@@ -185,6 +204,7 @@ foreach(shmtu_ocr_target
     shmtu_cas_ocr_lib
     shmtu_cas_ocr_server
     shmtu_cas_ocr_cli
+    shmtu_cas_ocr_tui
     shmtu_cas_ocr_gui
 )
     if(TARGET ${shmtu_ocr_target})

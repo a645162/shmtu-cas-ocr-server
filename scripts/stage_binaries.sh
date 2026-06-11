@@ -125,3 +125,4 @@ stage_binary() {
 
 stage_binary "ocr/shmtu-cas-ocr-server" "shmtu_cas_ocr_server"
 stage_binary "ocr/shmtu-cas-ocr-cli" "shmtu_cas_ocr_cli"
+stage_binary "ocr/shmtu-cas-ocr-tui" "shmtu_cas_ocr_tui"
