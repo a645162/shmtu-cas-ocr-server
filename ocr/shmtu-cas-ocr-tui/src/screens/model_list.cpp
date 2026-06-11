@@ -132,7 +132,7 @@ ftxui::Element ModelListScreen::Render() {
     }
     auto table = ftxui::Table(rows);
     table.SelectRow(selected_model_).Border(ftxui::LIGHT);
-    auto element = table.Render();
+    auto element = table.Render() | ftxui::vscroll_indicator | ftxui::frame;
 
     ftxui::Element details;
     if (selected_model_ >= 0 &&
