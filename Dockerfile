@@ -60,6 +60,7 @@ COPY --from=builder-cpu /install /opt/shmtu
 COPY --from=builder-cpu /build/build/linux-vcpkg/vcpkg_installed /opt/shmtu/vcpkg_installed
 COPY scripts/docker_download_models.sh /opt/shmtu/bin/docker_download_models.sh
 COPY scripts/docker_runtime_entrypoint.sh /opt/shmtu/bin/docker_runtime_entrypoint.sh
+COPY --from=builder-cpu /install/bin/shmtu-cas-ocr-tui /opt/shmtu/bin/shmtu-cas-ocr-tui
 
 RUN mkdir -p /app/models /app/logs
 RUN chmod +x /opt/shmtu/bin/docker_download_models.sh /opt/shmtu/bin/docker_runtime_entrypoint.sh
@@ -91,6 +92,7 @@ COPY --from=builder-gpu /install /opt/shmtu
 COPY --from=builder-gpu /build/build/linux-vcpkg-vulkan/vcpkg_installed /opt/shmtu/vcpkg_installed
 COPY scripts/docker_download_models.sh /opt/shmtu/bin/docker_download_models.sh
 COPY scripts/docker_runtime_entrypoint.sh /opt/shmtu/bin/docker_runtime_entrypoint.sh
+COPY --from=builder-gpu /install/bin/shmtu-cas-ocr-tui /opt/shmtu/bin/shmtu-cas-ocr-tui
 
 RUN mkdir -p /app/models /app/logs
 RUN chmod +x /opt/shmtu/bin/docker_download_models.sh /opt/shmtu/bin/docker_runtime_entrypoint.sh

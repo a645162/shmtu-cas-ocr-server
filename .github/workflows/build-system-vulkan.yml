@@ -152,8 +152,10 @@ jobs:
           path: |
             ${{ matrix.build_dir }}/ocr/shmtu-cas-ocr-server/shmtu_cas_ocr_server*
             ${{ matrix.build_dir }}/ocr/shmtu-cas-ocr-cli/shmtu_cas_ocr_cli*
+            ${{ matrix.build_dir }}/ocr/shmtu-cas-ocr-tui/shmtu_cas_ocr_tui*
             docker-runtime/shmtu_cas_ocr_server
             docker-runtime/shmtu_cas_ocr_cli
+            docker-runtime/shmtu_cas_ocr_tui
             release-assets/${{ matrix.variant }}/*
             ${{ matrix.archive_name }}
             ${{ matrix.bundled_archive_name }}

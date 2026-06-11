@@ -1,0 +1,224 @@
+name: Build and Release TUI
+
+# Triggers on a tag push (v*) OR manual dispatch.  Cross-compiles
+# shmtu-cas-ocr-tui for Linux, macOS and Windows, packages each
+# platform's binary into an archive and uploads it as a release
+# asset on the corresponding GitHub release.
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-tui-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  prepare-environment:
+    runs-on: ubuntu-24.04
+    outputs:
+      release-tag: ${{ steps.set-version.outputs.release-tag }}
+      release-version: ${{ steps.set-version.outputs.release-version }}
+      suite-version: ${{ steps.set-version.outputs.suite-version }}
+      is-tag-release: ${{ steps.set-version.outputs.is-tag-release }}
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Resolve release versions
+        id: set-version
+        run: |
+          SUITE_VERSION="$(tr -d '\n\r' < VERSION)"
+          RELEASE_TAG=""
+          RELEASE_VERSION="${SUITE_VERSION}"
+          IS_TAG_RELEASE="false"
+          if ! [[ "${SUITE_VERSION}" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "Invalid semantic version in VERSION: ${SUITE_VERSION}" >&2
+            exit 1
+          fi
+          if [[ "${GITHUB_REF}" == refs/tags/* ]]; then
+            RELEASE_TAG="${GITHUB_REF_NAME}"
+            RELEASE_VERSION="${RELEASE_TAG#v}"
+            IS_TAG_RELEASE="true"
+            if [[ "${RELEASE_VERSION}" != "${SUITE_VERSION}" ]]; then
+              echo "Tag version (${RELEASE_VERSION}) does not match VERSION (${SUITE_VERSION})." >&2
+              exit 1
+            fi
+          fi
+          echo "release-tag=${RELEASE_TAG}" >> "${GITHUB_OUTPUT}"
+          echo "release-version=${RELEASE_VERSION}" >> "${GITHUB_OUTPUT}"
+          echo "suite-version=${SUITE_VERSION}" >> "${GITHUB_OUTPUT}"
+          echo "is-tag-release=${IS_TAG_RELEASE}" >> "${GITHUB_OUTPUT}"
+          echo "RELEASE_TAG=${RELEASE_TAG}" >> "${GITHUB_ENV}"
+          echo "RELEASE_VERSION=${RELEASE_VERSION}" >> "${GITHUB_ENV}"
+          echo "SUITE_VERSION=${SUITE_VERSION}" >> "${GITHUB_ENV}"
+
+  build-tui:
+    name: build-tui (${{ matrix.label }})
+    needs: prepare-environment
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-24.04
+            label: ubuntu-2404-linux-x64
+            artifact: tui-ubuntu-2404-linux-x64
+            archive: tar.gz
+            triple: x64-linux
+          - os: windows-2022
+            label: windows-2022-x64
+            artifact: tui-windows-2022-x64
+            archive: zip
+            triple: x64-windows
+          - os: macos-14
+            label: macos-14-x64
+            artifact: tui-macos-14-x64
+            archive: tar.gz
+            triple: x64-osx
+    env:
+      VCPKG_BINARY_SOURCES: clear
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install Linux build dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+              build-essential \
+              cmake \
+              curl \
+              git \
+              ninja-build \
+              pkg-config \
+              unzip \
+              zip
+
+      - name: Install vcpkg (Linux)
+        if: runner.os == 'Linux'
+        uses: lukka/run-vcpkg@v11
+        with:
+          vcpkgDirectory: ${{ github.workspace }}/vcpkg
+          vcpkgGitCommitId: 2026-04-08-e0612b42ce44e55a0e630f2ee9d3c533a63d8bc1
+          triplet: ${{ matrix.triple }}
+
+      - name: Setup vcpkg (Windows)
+        if: runner.os == 'Windows'
+        uses: lukka/run-vcpkg@v11
+        with:
+          vcpkgDirectory: ${{ github.workspace }}/vcpkg
+          vcpkgGitCommitId: 2026-04-08-e0612b42ce44e55a0e630f2ee9d3c533a63d8bc1
+          triplet: ${{ matrix.triple }}
+
+      - name: Setup vcpkg (macOS)
+        if: runner.os == 'macOS'
+        uses: lukka/run-vcpkg@v11
+        with:
+          vcpkgDirectory: ${{ github.workspace }}/vcpkg
+          vcpkgGitCommitId: 2026-04-08-e0612b42ce44e55a0e630f2ee9d3c533a63d8bc1
+          triplet: ${{ matrix.triple }}
+
+      - name: Configure (vcpkg manifest mode)
+        run: |
+          cmake -S . -B build \
+              -G Ninja \
+              -DCMAKE_BUILD_TYPE=Release \
+              -DBUILD_TUI=ON \
+              -DBUILD_CLI=OFF \
+              -DBUILD_SERVER=OFF \
+              -DBUILD_GUI=OFF \
+              -DCMAKE_TOOLCHAIN_FILE="${VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake" \
+              -DVCPKG_MANIFEST_MODE=ON
+
+      - name: Build
+        run: |
+          cmake --build build --target shmtu_cas_ocr_tui --config Release -j
+
+      - name: Stage release assets
+        shell: bash
+        run: |
+          mkdir -p release-assets
+          if [ "${{ runner.os }}" = "Windows" ]; then
+            cp build/ocr/shmtu-cas-ocr-tui/Release/shmtu_cas_ocr_tui-*.exe release-assets/
+          else
+            cp build/ocr/shmtu-cas-ocr-tui/shmtu_cas_ocr_tui-* release-assets/ 2>/dev/null || \
+              cp build/ocr/shmtu-cas-ocr-tui/shmtu_cas_ocr_tui release-assets/
+          fi
+          ls -l release-assets
+
+      - name: Compute SHA256
+        shell: bash
+        run: |
+          cd release-assets
+          sha256sum * > SHA256SUMS.txt
+          cat SHA256SUMS.txt
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact }}
+          path: release-assets/*
+
+  publish-release:
+    name: publish-release
+    if: needs.prepare-environment.outputs.is-tag-release == 'true'
+    runs-on: ubuntu-24.04
+    needs:
+      - prepare-environment
+      - build-tui
+    steps:
+      - name: Download Linux artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: tui-ubuntu-2404-linux-x64
+          path: ./artifact/ubuntu
+
+      - name: Download Windows artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: tui-windows-2022-x64
+          path: ./artifact/windows
+
+      - name: Download macOS artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: tui-macos-14-x64
+          path: ./artifact/macos
+
+      - name: Bundle archives
+        run: |
+          set -euo pipefail
+          SUITE="${{ needs.prepare-environment.outputs.suite-version }}"
+          mkdir -p release-assets
+          for triple in ubuntu-2404-linux-x64 macos-14-x64; do
+            rm -rf staging && mkdir staging
+            cp -v "artifact/${triple}/"* staging/
+            (cd staging && sha256sum * > SHA256SUMS.txt)
+            tar -czf "release-assets/shmtu-cas-ocr-tui-${SUITE}-${triple}.tar.gz" \
+                -C staging .
+          done
+          rm -rf staging && mkdir staging
+          cp -v "artifact/windows/"* staging/
+          (cd staging && sha256sum * > SHA256SUMS.txt)
+          (cd staging && zip -r "../release-assets/shmtu-cas-ocr-tui-${SUITE}-windows-2022-x64.zip" .)
+          ls -l release-assets
+
+      - name: Publish GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ needs.prepare-environment.outputs.release-tag }}
+          name: ${{ needs.prepare-environment.outputs.release-tag }}
+          generate_release_notes: true
+          fail_on_unmatched_files: true
+          files: |
+            release-assets/*
