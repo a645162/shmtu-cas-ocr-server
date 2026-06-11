@@ -1,6 +1,4 @@
 // SPDX-License-Identifier: MIT
-
-
 #pragma once
 
 #include <shmtu/cas_ocr/manifest.h>
@@ -16,6 +14,12 @@ namespace shmtu::cas::ocr::tui {
 
 // The middle screen: when a release is selected this shows the list
 // of models declared in its manifest along with a metrics summary.
+//
+// Data flow: App fetches the manifest JSON from GitHub and feeds it
+// via `setManifest`.  Each model is rendered as one row of an FTXUI
+// Table (backbone / display name / params / val_acc / test_acc /
+// file count / supported engines).  The right panel offers a hint to
+// open the download dialog via 'd'.
 class ModelListScreen {
 public:
     using ModelSelectedCb = std::function<void(int model_index)>;
@@ -25,6 +29,8 @@ public:
 
     ModelListScreen();
 
+    // Populate the model table from a parsed manifest.  `tag` is kept
+    // for display in the panel header.
     void setManifest(const shmtu::cas::ocr::ReleaseManifest& manifest,
                      const std::string& tag);
     void clear();
@@ -35,6 +41,7 @@ public:
         return models_;
     }
 
+    // Render the full FTXUI element tree for this screen.
     ftxui::Element Render();
     ftxui::Component component();
 
@@ -45,8 +52,8 @@ public:
         on_download_requested_ = std::move(cb);
     }
 
-    // The currently selected (engine, precision) pair, or empty
-    // string if none has been chosen.
+    // The currently selected (engine, precision) pair — populated by
+    // scanning the manifest's artifact map.
     std::string selectedEngine() const { return engine_choices_[selected_engine_]; }
     std::string selectedPrecision() const { return precision_choices_[selected_precision_]; }
 
@@ -54,8 +61,8 @@ private:
     std::vector<const shmtu::cas::ocr::ModelInfo*> models_;
     std::string current_tag_;
     int selected_model_ = 0;
-    int selected_engine_ = 0;
-    int selected_precision_ = 0;
+    int selected_engine_ = 0;    // index into engine_choices_
+    int selected_precision_ = 0; // index into precision_choices_
     std::vector<std::string> engine_choices_;
     std::vector<std::string> precision_choices_;
 
