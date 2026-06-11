@@ -36,10 +36,23 @@ int main(int argc, char* argv[]) {
                                         QStringLiteral("precision"));
     QCommandLineOption use_gpu_option(QStringList{QStringLiteral("use-gpu")},
                                       QString::fromUtf8("enable GPU acceleration by default"));
+    QCommandLineOption model_version_option(QStringList{QStringLiteral("model-version")},
+                                           QString::fromUtf8("Model version: v1 or v2 (default: v2)"),
+                                           QStringLiteral("version"),
+                                           QStringLiteral("v2"));
+    QCommandLineOption v2_tag_option(QStringList{QStringLiteral("v2-tag")},
+                                    QString::fromUtf8("V2 release tag, e.g. v2.0.5"),
+                                    QStringLiteral("tag"));
+    QCommandLineOption v2_backbone_option(QStringList{QStringLiteral("v2-backbone")},
+                                         QString::fromUtf8("V2 backbone, e.g. mobilenet_v3_small"),
+                                         QStringLiteral("backbone"));
 
     parser.addOption(model_dir_option);
     parser.addOption(precision_option);
     parser.addOption(use_gpu_option);
+    parser.addOption(model_version_option);
+    parser.addOption(v2_tag_option);
+    parser.addOption(v2_backbone_option);
     parser.process(app);
 
     LaunchOptions launch_options;
@@ -58,13 +71,27 @@ int main(int argc, char* argv[]) {
     }
     launch_options.use_gpu = launch_options.use_gpu || parser.isSet(use_gpu_option);
 
+    if (parser.isSet(model_version_option)) {
+        const auto version = parser.value(model_version_option).toStdString();
+        launch_options.model_version = shmtu::cas::ocr::model_version_from_string(version);
+    }
+    if (parser.isSet(v2_tag_option)) {
+        launch_options.v2_tag = parser.value(v2_tag_option).toStdString();
+    }
+    if (parser.isSet(v2_backbone_option)) {
+        launch_options.v2_backbone = parser.value(v2_backbone_option).toStdString();
+    }
+
     installCrashHandlers();
     {
         std::ostringstream oss;
         oss << "main: GUI starting"
             << ", model_dir=" << launch_options.model_dir
             << ", precision=" << launch_options.precision
-            << ", use_gpu=" << (launch_options.use_gpu ? "true" : "false");
+            << ", use_gpu=" << (launch_options.use_gpu ? "true" : "false")
+            << ", model_version=" << shmtu::cas::ocr::model_version_to_string(launch_options.model_version)
+            << ", v2_tag=" << (launch_options.v2_tag.empty() ? "(auto)" : launch_options.v2_tag)
+            << ", v2_backbone=" << (launch_options.v2_backbone.empty() ? "(default)" : launch_options.v2_backbone);
         logMessage(oss.str());
     }
 

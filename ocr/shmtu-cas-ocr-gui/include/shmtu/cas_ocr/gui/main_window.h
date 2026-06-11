@@ -62,11 +62,14 @@ private:
 
     void onAbout();
     void onCheckDownloadModels();
+    void onDownloadV2Model();
+    void onModelVersionChanged(int index);
     void startModelDownload(const std::vector<std::string>& missing_files, bool use_gitee);
     void loadModelFromCurrentSettings();
     void onReleaseModel();
     void updateGpuAvailabilityUi();
     void updateModelStatusUi();
+    void updateV2ModelSettings();
 
     void onDownloadCaptcha();
     void onOpenLocalImage();
@@ -92,6 +95,9 @@ private:
     void setStatusText(const QString& text);
 
     LaunchOptions launch_options_;
+    shmtu::cas::ocr::ModelVersion current_model_version_ = shmtu::cas::ocr::ModelVersion::V2;
+    std::string current_v2_tag_;       // e.g. "v2.0.5"
+    std::string current_v2_backbone_;  // e.g. "mobilenet_v3_small"
     std::unique_ptr<shmtu::cas::ocr::CasOcr> ocr_;
     bool model_loaded_ = false;
     bool download_active_ = false;
@@ -124,6 +130,9 @@ private:
     QWidget* bottom_bar_panel_ = nullptr;
     QLabel* status_label_ = nullptr;
     QComboBox* precision_combo_ = nullptr;
+    QComboBox* model_version_combo_ = nullptr;
+    QPushButton* download_v2_button_ = nullptr;
+    QLabel* v2_model_label_ = nullptr;
     QCheckBox* use_gpu_checkbox_ = nullptr;
 
     QToolButton* batch_toggle_button_ = nullptr;

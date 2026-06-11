@@ -33,6 +33,10 @@ constexpr ModelFileInfo NCNN_MODEL_FILES[] = {
     {"resnet34_digit_latest.%s.bin"},
 };
 
+std::string boolToString(const bool value) {
+    return value ? "true" : "false";
+}
+
 struct CurlProgressPayload {
     std::function<bool(curl_off_t, curl_off_t)> callback;
 };
@@ -383,6 +387,123 @@ bool downloadUrlToMemory(const std::string& url,
         logMessage(oss.str());
     }
     return ok;
+}
+
+std::string buildReleaseAssetUrl(const std::string& base,
+                                 const std::string& tag,
+                                 const std::string& asset_name) {
+    const std::string base_url =
+        (base == "gitee" || base == "Gitee") ? GITEE_RELEASES_BASE_URL : GITHUB_RELEASES_BASE_URL;
+    return base_url + "/" + tag + "/" + asset_name;
+}
+
+std::string downloadReleaseManifest(const std::string& base,
+                                    const std::string& tag,
+                                    long& http_status,
+                                    std::string& error_message) {
+    const auto url = buildReleaseAssetUrl(base, tag, "model-assets.json");
+    logMessage("downloadReleaseManifest: fetching " + url);
+    std::vector<uint8_t> data;
+    const bool ok = shmtu::cas::ocr::curlutil::downloadUrlToMemory(
+                        url, data, http_status, error_message) &&
+                    http_status == 200 && !data.empty();
+    if (!ok) {
+        logMessage("downloadReleaseManifest: failed, http_status=" +
+                   std::to_string(http_status) + ", error=" + error_message);
+        return {};
+    }
+    return std::string(data.begin(), data.end());
+}
+
+bool downloadV2Artifact(const shmtu::cas::ocr::ModelInfo& model,
+                        const std::string& engine,
+                        const std::string& precision,
+                        const std::string& dest_dir,
+                        bool use_gitee_first,
+                        const DownloadBytesProgressCallback& bytes_progress_cb,
+                        std::string& error_message) {
+    logMessage("downloadV2Artifact: begin, model=" + model.display_name +
+               ", engine=" + engine + ", precision=" + precision +
+               ", dest_dir=" + dest_dir +
+               ", gitee_first=" + boolToString(use_gitee_first));
+
+    const auto* artifact = shmtu::cas::ocr::find_artifact(model, engine, precision);
+    if (!artifact) {
+        error_message = "No artifact for engine=" + engine + ", precision=" + precision;
+        logMessage("downloadV2Artifact: " + error_message);
+        return false;
+    }
+
+    try {
+        std::filesystem::create_directories(dest_dir);
+    } catch (const std::exception& e) {
+        error_message = e.what();
+        return false;
+    }
+
+    const auto tag = DEFAULT_RELEASE_TAG;
+    const auto primary = use_gitee_first ? "gitee" : "github";
+    const auto fallback = use_gitee_first ? "github" : "gitee";
+
+    bool all_ok = true;
+    for (const auto& file : artifact->files) {
+        const auto filepath =
+            std::filesystem::path(dest_dir) / file.release_asset_name;
+        const auto dest = filepath.string();
+
+        bool download_ok = false;
+        for (const auto& source : {std::string(primary), std::string(fallback)}) {
+            const auto url = buildReleaseAssetUrl(source, tag, file.release_asset_name);
+            logMessage("downloadV2Artifact: downloading " + url + " -> " + dest);
+
+            long http_status = 0;
+            std::string curl_error;
+            const bool ok =
+                shmtu::cas::ocr::curlutil::downloadUrlToFile(url, dest, http_status, curl_error);
+            if (!ok || http_status != 200) {
+                std::error_code ec;
+                std::filesystem::remove(dest, ec);
+                logMessage("downloadV2Artifact: download failed from " +
+                           source + ", status=" + std::to_string(http_status) +
+                           ", error=" + curl_error);
+                continue;
+            }
+
+            // Verify SHA256
+            const auto actual_hash = computeSha256(dest);
+            if (actual_hash.empty()) {
+                logMessage("downloadV2Artifact: sha256sum failed for " + dest +
+                           ", skipping verification");
+            } else if (actual_hash != file.sha256) {
+                std::error_code ec;
+                std::filesystem::remove(dest, ec);
+                logMessage("downloadV2Artifact: checksum mismatch for " +
+                           file.release_asset_name +
+                           ", expected=" + file.sha256 +
+                           ", actual=" + actual_hash);
+                continue;
+            } else {
+                logMessage("downloadV2Artifact: checksum verified for " +
+                           file.release_asset_name);
+            }
+
+            download_ok = true;
+            break;
+        }
+
+        if (!download_ok) {
+            all_ok = false;
+            error_message += "downloadV2Artifact: failed to download " +
+                             file.release_asset_name + "\n";
+        }
+
+        if (bytes_progress_cb) {
+            bytes_progress_cb(0, 0);
+        }
+    }
+
+    logMessage("downloadV2Artifact: finished, all_ok=" + boolToString(all_ok));
+    return all_ok;
 }
 
 }  // namespace shmtu::cas::ocr::gui

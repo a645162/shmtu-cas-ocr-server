@@ -350,6 +350,9 @@ void setAccentButton(QPushButton* button) {
 
 MainWindow::MainWindow(const LaunchOptions& launch_options)
     : launch_options_(launch_options),
+      current_model_version_(launch_options.model_version),
+      current_v2_tag_(launch_options.v2_tag),
+      current_v2_backbone_(launch_options.v2_backbone),
       ocr_(std::make_unique<shmtu::cas::ocr::CasOcr>()) {
     setWindowTitle(qs(APP_TITLE_CN));
     resize(980, 720);
@@ -366,7 +369,10 @@ MainWindow::MainWindow(const LaunchOptions& launch_options)
         oss << "MainWindow: initialized"
             << ", model_dir=" << launch_options_.model_dir
             << ", precision=" << launch_options_.precision
-            << ", use_gpu=" << boolToString(launch_options_.use_gpu);
+            << ", use_gpu=" << boolToString(launch_options_.use_gpu)
+            << ", model_version=" << shmtu::cas::ocr::model_version_to_string(current_model_version_)
+            << ", v2_tag=" << current_v2_tag_
+            << ", v2_backbone=" << current_v2_backbone_;
         logMessage(oss.str());
     }
 }
@@ -428,6 +434,36 @@ void MainWindow::buildTopBar(QVBoxLayout* root_layout) {
 
     panel_layout->addLayout(row_layout);
 
+    // --- Model version row ---
+    auto* version_row = new QHBoxLayout();
+    version_row->setSpacing(8);
+
+    model_version_combo_ = new QComboBox(top_bar_panel_);
+    model_version_combo_->addItem(qs("模型版本: V2 (默认)"));
+    model_version_combo_->addItem(qs("模型版本: V1 (经典)"));
+    model_version_combo_->setCurrentIndex(
+        current_model_version_ == shmtu::cas::ocr::ModelVersion::V1 ? 1 : 0);
+    model_version_combo_->setToolTip(qs("V2: 单模型 TriSlot Decoder (默认) | V1: 三模型 ResNet"));
+    version_row->addWidget(model_version_combo_);
+
+    v2_model_label_ = new QLabel(qs("V2 模型: 未选择"), top_bar_panel_);
+    v2_model_label_->setObjectName(QStringLiteral("dimText"));
+    if (!current_v2_tag_.empty()) {
+        v2_model_label_->setText(QString::fromStdString("V2: " + current_v2_tag_ +
+                                    " / " + (current_v2_backbone_.empty() ? "默认" : current_v2_backbone_)));
+    }
+    version_row->addWidget(v2_model_label_, 1);
+
+    download_v2_button_ = new QPushButton(qs("下载 V2 模型"), top_bar_panel_);
+    if (current_model_version_ != shmtu::cas::ocr::ModelVersion::V2) {
+        download_v2_button_->setVisible(false);
+        v2_model_label_->setVisible(false);
+    }
+    version_row->addWidget(download_v2_button_);
+
+    panel_layout->addLayout(version_row);
+
+    // --- Option row ---
     auto* option_row = new QHBoxLayout();
     option_row->setSpacing(8);
     option_row->addWidget(createDimLabel(qs("精度:"), top_bar_panel_));
@@ -474,6 +510,10 @@ void MainWindow::buildTopBar(QVBoxLayout* root_layout) {
 
     connect(check_download_button_, &QPushButton::clicked, this,
             [this]() { onCheckDownloadModels(); });
+    connect(download_v2_button_, &QPushButton::clicked, this,
+            [this]() { onDownloadV2Model(); });
+    connect(model_version_combo_, &QComboBox::currentIndexChanged, this,
+            &MainWindow::onModelVersionChanged);
     connect(use_gpu_checkbox_, &QCheckBox::toggled, this, [this](bool checked) {
         logMessage("use_gpu_checkbox toggled: " + boolToString(checked));
         if (!model_loaded_) {
@@ -771,12 +811,20 @@ void MainWindow::onAbout() {
 }
 
 void MainWindow::onCheckDownloadModels() {
-    logMessage("onCheckDownloadModels: entered");
+    logMessage("onCheckDownloadModels: entered, model_version=" +
+               shmtu::cas::ocr::model_version_to_string(current_model_version_));
     if (download_active_) {
         QMessageBox::information(this, qs("下载"), qs("模型正在下载中，请稍候..."));
         return;
     }
 
+    // For V2, redirect to V2 download handler
+    if (current_model_version_ == shmtu::cas::ocr::ModelVersion::V2) {
+        onDownloadV2Model();
+        return;
+    }
+
+    // V1 flow (original)
     const auto model_dir = model_dir_edit_->text().toStdString();
     const auto precision = precision_combo_->currentText().toStdString();
     const auto missing_files = missingModelFiles(model_dir, precision);
@@ -812,6 +860,133 @@ void MainWindow::onCheckDownloadModels() {
 
     logMessage("onCheckDownloadModels: user accepted model download");
     startModelDownload(missing_files, true);
+}
+
+void MainWindow::onDownloadV2Model() {
+    logMessage("onDownloadV2Model: entered");
+    if (download_active_) {
+        QMessageBox::information(this, qs("下载"), qs("模型正在下载中，请稍候..."));
+        return;
+    }
+
+    const auto model_dir = model_dir_edit_->text().toStdString();
+    const auto tag = current_v2_tag_.empty() ? std::string(DEFAULT_RELEASE_TAG) : current_v2_tag_;
+    const auto precision = precision_combo_->currentText().toStdString();
+
+    // Ask user: GitHub or Gitee
+    QString prompt = qs("正在下载 V2 模型: ") + QString::fromStdString(tag) +
+                     QStringLiteral("\n\n") +
+                     qs("请选择下载源：\nGitHub - 国际\nGitee - 国内（推荐）");
+    const auto answer = QMessageBox::question(this, qs("下载 V2 模型"), prompt,
+                                              QMessageBox::Yes | QMessageBox::No,
+                                              QMessageBox::Yes);
+    const bool use_gitee = (answer == QMessageBox::Yes);
+
+    // Download manifest
+    setStatusText(qs("正在获取模型清单..."));
+    QApplication::processEvents();
+
+    const auto source = use_gitee ? "gitee" : "github";
+    long http_status = 0;
+    std::string error_message;
+    const auto manifest_json = downloadReleaseManifest(source, tag, http_status, error_message);
+    if (manifest_json.empty()) {
+        logMessage("onDownloadV2Model: manifest download failed, status=" +
+                   std::to_string(http_status) + ", error=" + error_message);
+        setStatusText(qs("获取模型清单失败"));
+        QMessageBox::critical(this, qs("下载 V2 模型"),
+                              qs("获取模型清单失败：\n") + QString::fromStdString(error_message));
+        return;
+    }
+
+    auto manifest = shmtu::cas::ocr::parse_release_manifest(manifest_json);
+    if (manifest.models.empty()) {
+        logMessage("onDownloadV2Model: manifest parse failed or empty models");
+        setStatusText(qs("模型清单解析失败"));
+        QMessageBox::critical(this, qs("下载 V2 模型"), qs("模型清单解析失败或为空。"));
+        return;
+    }
+
+    // Find the model matching backbone preference
+    const shmtu::cas::ocr::ModelInfo* target_model = nullptr;
+    if (!current_v2_backbone_.empty()) {
+        for (const auto& model : manifest.models) {
+            if (model.backbone == current_v2_backbone_) {
+                target_model = &model;
+                break;
+            }
+        }
+    }
+    if (!target_model) {
+        target_model = &manifest.models[0];  // default to first model
+    }
+
+    logMessage("onDownloadV2Model: selected model=" + target_model->display_name +
+               ", backbone=" + target_model->backbone);
+
+    download_active_ = true;
+    check_download_button_->setEnabled(false);
+    download_v2_button_->setEnabled(false);
+
+    const bool ok = downloadV2Artifact(
+        *target_model, "ncnn", precision, model_dir, use_gitee,
+        [this](std::int64_t /*bytes_now*/, std::int64_t /*bytes_total*/) {
+            QApplication::processEvents();
+            return true;
+        },
+        error_message);
+
+    download_active_ = false;
+    check_download_button_->setEnabled(true);
+    download_v2_button_->setEnabled(true);
+
+    if (ok) {
+        logMessage("onDownloadV2Model: download succeeded");
+        download_progress_bar_->setValue(100);
+        setStatusText(qs("V2 模型下载完成，正在加载..."));
+        loadModelFromCurrentSettings();
+    } else {
+        logMessage("onDownloadV2Model: download failed, error=" + error_message);
+        download_progress_bar_->setValue(0);
+        setStatusText(qs("V2 模型下载失败"));
+        QMessageBox::critical(this, qs("下载失败"),
+                              qs("V2 模型下载失败：\n") + QString::fromStdString(error_message));
+    }
+}
+
+void MainWindow::onModelVersionChanged(int index) {
+    current_model_version_ =
+        (index == 1) ? shmtu::cas::ocr::ModelVersion::V1 : shmtu::cas::ocr::ModelVersion::V2;
+
+    const bool is_v2 = (current_model_version_ == shmtu::cas::ocr::ModelVersion::V2);
+    if (download_v2_button_) download_v2_button_->setVisible(is_v2);
+    if (v2_model_label_) v2_model_label_->setVisible(is_v2);
+
+    switch (current_model_version_) {
+        case shmtu::cas::ocr::ModelVersion::V2:
+            logMessage("onModelVersionChanged: switched to V2");
+            break;
+        case shmtu::cas::ocr::ModelVersion::V1:
+            logMessage("onModelVersionChanged: switched to V1");
+            break;
+    }
+
+    // Release current model if loaded, since version changed
+    if (model_loaded_) {
+        logMessage("onModelVersionChanged: releasing loaded model due to version change");
+        onReleaseModel();
+    }
+}
+
+void MainWindow::updateV2ModelSettings() {
+    if (!v2_model_label_) return;
+    if (current_v2_tag_.empty() && current_v2_backbone_.empty()) {
+        v2_model_label_->setText(qs("V2 模型: 默认 (最新)"));
+    } else {
+        v2_model_label_->setText(QString::fromStdString(
+            "V2: " + (current_v2_tag_.empty() ? "最新" : current_v2_tag_) +
+            " / " + (current_v2_backbone_.empty() ? "默认" : current_v2_backbone_)));
+    }
 }
 
 void MainWindow::startModelDownload(const std::vector<std::string>& missing_files, bool use_gitee) {
@@ -886,12 +1061,13 @@ void MainWindow::loadModelFromCurrentSettings() {
         oss << "loadModelFromCurrentSettings: begin"
             << ", model_dir=" << model_dir
             << ", precision=" << precision
-            << ", use_gpu=" << boolToString(use_gpu);
+            << ", use_gpu=" << boolToString(use_gpu)
+            << ", model_version=" << shmtu::cas::ocr::model_version_to_string(current_model_version_);
         logMessage(oss.str());
     }
 
     ocr_ = std::make_unique<shmtu::cas::ocr::CasOcr>(model_dir);
-    if (!ocr_->load_model(precision.empty() ? "fp16" : precision, use_gpu)) {
+    if (!ocr_->load_model(precision.empty() ? "fp16" : precision, use_gpu, 0, current_model_version_)) {
         logMessage("loadModelFromCurrentSettings: failed");
         model_loaded_ = false;
         updateModelStatusUi();
