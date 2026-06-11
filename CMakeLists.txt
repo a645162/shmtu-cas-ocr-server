@@ -27,7 +27,7 @@ include(ShmtuVersion)
 # --------------------------------------------------------------------------
 option(BUILD_SERVER "Build the HTTP/TCP server executable" ON)
 option(BUILD_CLI    "Build the CLI tool executable" ON)
-option(BUILD_TUI    "Build the interactive TUI tool" OFF)
+option(BUILD_TUI    "Build the interactive TUI tool" ON)
 option(BUILD_GUI    "Build the GUI application" OFF)
 option(USE_VULKAN   "Enable Vulkan/GPU support via ncnn" OFF)
 option(BUILD_SHARED_LIBS "Build shared libraries" OFF)
