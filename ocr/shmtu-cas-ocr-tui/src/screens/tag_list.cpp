@@ -55,7 +55,8 @@ ftxui::Element TagListScreen::Render() {
     ftxui::Element body;
     if (loading_) {
         ftxui::Elements rows;
-        rows.push_back(ftxui::spinner(21, 0) | ftxui::center);
+        rows.push_back(ftxui::spinner(21, spinner_frame_) | ftxui::center);
+        spinner_frame_ = (spinner_frame_ + 1) % 256;
         rows.push_back(ftxui::text("Loading releases from GitHub...") |
                        ftxui::dim);
         body = ftxui::vbox(std::move(rows));

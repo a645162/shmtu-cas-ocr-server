@@ -1,0 +1,12 @@
+# clang-format configuration for shmtu-cas-ocr-server
+# Requires clang-format >= 16
+BasedOnStyle: Google
+Language: Cpp
+Standard: c++23
+ColumnLimit: 90
+IndentWidth: 4
+TabWidth: 4
+UseTab: Never
+AccessModifierOffset: -4
+AllowShortFunctionsOnASingleLine: InlineOnly
+AllowShortIfStatementsOnASingleLine: false

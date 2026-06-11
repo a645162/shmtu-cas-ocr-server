@@ -56,6 +56,7 @@ private:
     std::string last_error_;
     TagSelectedCb on_tag_selected_;
     RefreshCb on_refresh_;
+    int spinner_frame_ = 0;
 };
 
 }  // namespace shmtu::cas::ocr::tui
