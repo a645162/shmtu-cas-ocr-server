@@ -387,22 +387,12 @@ ReleaseManifest parse_release_manifest(std::string_view json_text) {
         }
     }
 
-    // Preferred path: schema_version >= 2, structured `models` array.
+    // Parse structured `models` array (schema_version 2).
     if (const JsonValue* p = find_member(root, "models"); p && p->type == JsonType::Array) {
         out.models.reserve(p->array.size());
         for (const auto& v : p->array) {
             if (v.type == JsonType::Object) {
                 out.models.push_back(parse_model(v));
-            }
-        }
-    }
-
-    // Legacy / fallback path: flat `artifacts` array (v1 manifest).
-    if (const JsonValue* p = find_member(root, "artifacts"); p && p->type == JsonType::Array) {
-        out.flat_artifacts.reserve(p->array.size());
-        for (const auto& v : p->array) {
-            if (v.type == JsonType::Object) {
-                out.flat_artifacts.push_back(parse_artifact(v));
             }
         }
     }
@@ -431,7 +421,7 @@ std::vector<const ModelInfo*> list_models(const ReleaseManifest& manifest) {
 }
 
 std::string infer_asset_stem_from_dir(const std::string& model_dir) {
-    // Recognised v2 stems.  Add new entries here as new backbones ship.
+    // Known v2 asset stems.  Add new entries here as new backbones ship.
     static const std::vector<std::string> kKnownStems = {
         "mobilenet_v3_small.trislot_decoder.v2_0",
         "mobilenetv4_conv_small.trislot_decoder.v2_0",

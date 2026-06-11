@@ -85,9 +85,7 @@ struct GpuDeviceInfo {
 // GitHub/Gitee release for `a645162/shmtu-cas-ocr-model`.  Schema version 2
 // describes a structured, multi-model catalogue where each model carries
 // metrics (val/test accuracy and loss) and per-engine, per-precision
-// artifact descriptors with embedded SHA256 digests.  Earlier schemas
-// exposed only a flat `artifacts` list; `ReleaseManifest::flat_artifacts`
-// preserves that view for backwards compatibility.
+// artifact descriptors with embedded SHA256 digests.
 
 // Optional model metrics — every field is optional because the manifest
 // may carry only some of them depending on the release.
@@ -134,7 +132,6 @@ struct ReleaseManifest {
     int model_count = 0;
     std::vector<std::string> modellist;
     std::vector<ModelInfo> models;
-    std::vector<ArtifactInfo> flat_artifacts;  // legacy v1 manifest view
 };
 
 } // namespace shmtu::cas::ocr
