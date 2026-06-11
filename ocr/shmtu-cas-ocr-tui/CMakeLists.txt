@@ -84,4 +84,3 @@ include(GNUInstallDirs)
 
 install(TARGETS shmtu_cas_ocr_tui
     RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
-)
