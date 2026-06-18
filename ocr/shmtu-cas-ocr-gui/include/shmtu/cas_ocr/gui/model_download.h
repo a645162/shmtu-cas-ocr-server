@@ -74,4 +74,25 @@ bool downloadV2Artifact(const shmtu::cas::ocr::ModelInfo& model,
                         const DownloadBytesProgressCallback& bytes_progress_cb,
                         std::string& error_message);
 
+// Overload that accepts an explicit release tag (e.g. "v2.0.5") instead of
+// using DEFAULT_RELEASE_TAG.  This is the preferred entry point for callers
+// that already know which release they are downloading from.
+bool downloadV2Artifact(const shmtu::cas::ocr::ModelInfo& model,
+                        const std::string& engine,
+                        const std::string& precision,
+                        const std::string& dest_dir,
+                        const std::string& tag,
+                        bool use_gitee_first,
+                        const DownloadBytesProgressCallback& bytes_progress_cb,
+                        std::string& error_message);
+
+// Fetch the list of v2 release tags from GitHub, sorted newest-first.
+// Filters to tags matching "v2.*".  Returns empty vector on failure.
+std::vector<std::string> fetchV2ReleaseTags(long& http_status,
+                                             std::string& error_message);
+
+// Fetch the latest v2 release tag from GitHub.
+// Returns empty string on failure.
+std::string fetchLatestV2Tag(long& http_status, std::string& error_message);
+
 }  // namespace shmtu::cas::ocr::gui

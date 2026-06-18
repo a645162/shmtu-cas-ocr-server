@@ -929,7 +929,7 @@ void MainWindow::onDownloadV2Model() {
     download_v2_button_->setEnabled(false);
 
     const bool ok = downloadV2Artifact(
-        *target_model, "ncnn", precision, model_dir, use_gitee,
+        *target_model, "ncnn", precision, model_dir, tag, use_gitee,
         [this](std::int64_t /*bytes_now*/, std::int64_t /*bytes_total*/) {
             QApplication::processEvents();
             return true;

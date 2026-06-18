@@ -149,8 +149,8 @@ std::string computeSha256(const std::string& filepath) {
         logMessage("computeSha256: popen failed for " + filepath);
         return "";
     }
-    char buf[65] = {0};
-    if (!fgets(buf, 64, pipe)) {
+    char buf[256] = {0};
+    if (!fgets(buf, sizeof(buf), pipe)) {
         pclose(pipe);
         logMessage("computeSha256: sha256sum produced no output for " + filepath);
         return "";
@@ -422,9 +422,24 @@ bool downloadV2Artifact(const shmtu::cas::ocr::ModelInfo& model,
                         bool use_gitee_first,
                         const DownloadBytesProgressCallback& bytes_progress_cb,
                         std::string& error_message) {
+    // Delegate to the tag-aware overload using the default release tag.
+    return downloadV2Artifact(model, engine, precision, dest_dir,
+                              DEFAULT_RELEASE_TAG,
+                              use_gitee_first, bytes_progress_cb, error_message);
+}
+
+bool downloadV2Artifact(const shmtu::cas::ocr::ModelInfo& model,
+                        const std::string& engine,
+                        const std::string& precision,
+                        const std::string& dest_dir,
+                        const std::string& tag,
+                        bool use_gitee_first,
+                        const DownloadBytesProgressCallback& bytes_progress_cb,
+                        std::string& error_message) {
     logMessage("downloadV2Artifact: begin, model=" + model.display_name +
                ", engine=" + engine + ", precision=" + precision +
                ", dest_dir=" + dest_dir +
+               ", tag=" + tag +
                ", gitee_first=" + boolToString(use_gitee_first));
 
     const auto* artifact = shmtu::cas::ocr::find_artifact(model, engine, precision);
@@ -441,7 +456,6 @@ bool downloadV2Artifact(const shmtu::cas::ocr::ModelInfo& model,
         return false;
     }
 
-    const auto tag = DEFAULT_RELEASE_TAG;
     const auto primary = use_gitee_first ? "gitee" : "github";
     const auto fallback = use_gitee_first ? "github" : "gitee";
 
@@ -504,6 +518,165 @@ bool downloadV2Artifact(const shmtu::cas::ocr::ModelInfo& model,
 
     logMessage("downloadV2Artifact: finished, all_ok=" + boolToString(all_ok));
     return all_ok;
+}
+
+// --------------------------------------------------------------------------
+// GitHub Releases API — fetch v2 tag list
+// --------------------------------------------------------------------------
+
+namespace {
+
+constexpr auto GITHUB_API_BASE =
+    "https://api.github.com/repos/a645162/shmtu-cas-ocr-model";
+
+// Lightweight extraction of all "tag_name" string values from a GitHub
+// `/releases` JSON response.  No full parse — just scan for the pattern
+// `"tag_name":"<value>"` (with optional whitespace around the colon).
+std::vector<std::string> extractTagNames(std::string_view json) {
+    std::vector<std::string> tags;
+    const std::string needle = "\"tag_name\"";
+    std::size_t pos = 0;
+    while (pos < json.size()) {
+        auto hit = json.find(needle, pos);
+        if (hit == std::string_view::npos) break;
+        // Skip to the colon
+        auto p = hit + needle.size();
+        while (p < json.size() && std::isspace(static_cast<unsigned char>(json[p]))) ++p;
+        if (p >= json.size() || json[p] != ':') { pos = hit + 1; continue; }
+        ++p;
+        while (p < json.size() && std::isspace(static_cast<unsigned char>(json[p]))) ++p;
+        // Expect opening quote
+        if (p >= json.size() || json[p] != '"') { pos = hit + 1; continue; }
+        ++p;
+        // Read until closing quote
+        std::string tag;
+        while (p < json.size() && json[p] != '"') {
+            if (json[p] == '\\' && p + 1 < json.size()) {
+                tag.push_back(json[p + 1]);
+                p += 2;
+            } else {
+                tag.push_back(json[p]);
+                ++p;
+            }
+        }
+        if (!tag.empty()) {
+            tags.push_back(std::move(tag));
+        }
+        pos = (p < json.size()) ? p + 1 : p;
+    }
+    return tags;
+}
+
+// Simple semver comparison for "v2.x.y" tags.
+// Returns <0 if a<b, 0 if equal, >0 if a>b.
+int compareV2Tags(std::string_view a, std::string_view b) {
+    // Strip leading 'v' or 'V'
+    auto strip = [](std::string_view s) -> std::string_view {
+        if (!s.empty() && (s[0] == 'v' || s[0] == 'V')) s.remove_prefix(1);
+        return s;
+    };
+    auto sa = strip(a), sb = strip(b);
+    // Parse major.minor.patch
+    auto parse = [](std::string_view s) -> std::tuple<int,int,int> {
+        int maj = 0, min = 0, pat = 0;
+        auto p1 = s.find('.');
+        if (p1 == std::string_view::npos) {
+            maj = std::atoi(std::string(s).c_str());
+            return {maj, min, pat};
+        }
+        maj = std::atoi(std::string(s.substr(0, p1)).c_str());
+        auto p2 = s.find('.', p1 + 1);
+        if (p2 == std::string_view::npos) {
+            min = std::atoi(std::string(s.substr(p1 + 1)).c_str());
+            return {maj, min, pat};
+        }
+        min = std::atoi(std::string(s.substr(p1 + 1, p2 - p1 - 1)).c_str());
+        pat = std::atoi(std::string(s.substr(p2 + 1)).c_str());
+        return {maj, min, pat};
+    };
+    auto [amaj, amin, apat] = parse(sa);
+    auto [bmaj, bmin, bpat] = parse(sb);
+    if (amaj != bmaj) return amaj < bmaj ? -1 : 1;
+    if (amin != bmin) return amin < bmin ? -1 : 1;
+    if (apat != bpat) return apat < bpat ? -1 : 1;
+    return 0;
+}
+
+// Check if a tag looks like a v2.x release.
+bool isV2Tag(std::string_view tag) {
+    if (tag.size() < 2) return false;
+    if (tag[0] != 'v' && tag[0] != 'V') return false;
+    // Must start with v2.
+    return tag.size() >= 3 && tag[1] == '2';
+}
+
+}  // namespace
+
+std::vector<std::string> fetchV2ReleaseTags(long& http_status,
+                                             std::string& error_message) {
+    // Try GitHub API first, then Gitee API.
+    const struct { const char* name; const char* url; } sources[] = {
+        {"github", GITHUB_API_BASE},
+        {"gitee",  "https://gitee.com/api/v5/repos/a645162/shmtu-cas-ocr-model"},
+    };
+
+    for (const auto& src : sources) {
+        const std::string url = std::string(src.url) + "/releases?per_page=100";
+        std::vector<uint8_t> data;
+        long status = 0;
+        std::string err;
+        const bool ok = shmtu::cas::ocr::curlutil::downloadUrlToMemory(
+                            url, data, status, err) &&
+                        status == 200 && !data.empty();
+        if (!ok) {
+            logMessage("fetchV2ReleaseTags: " + std::string(src.name) +
+                       " failed, http_status=" + std::to_string(status) +
+                       ", error=" + err);
+            http_status = status;
+            error_message = err;
+            continue;
+        }
+
+        const std::string body(data.begin(), data.end());
+        auto all_tags = extractTagNames(body);
+
+        // Filter to v2.x only
+        std::vector<std::string> v2_tags;
+        for (auto& tag : all_tags) {
+            if (isV2Tag(tag)) {
+                v2_tags.push_back(std::move(tag));
+            }
+        }
+
+        // Sort descending (newest first)
+        std::sort(v2_tags.begin(), v2_tags.end(),
+                  [](const std::string& a, const std::string& b) {
+                      return compareV2Tags(a, b) > 0;
+                  });
+
+        if (!v2_tags.empty()) {
+            logMessage("fetchV2ReleaseTags: found " + std::to_string(v2_tags.size()) +
+                       " v2 tags via " + src.name);
+            http_status = 200;
+            error_message.clear();
+            return v2_tags;
+        }
+    }
+
+    // Fallback: hard-coded list for offline / rate-limited scenarios.
+    logMessage("fetchV2ReleaseTags: all API sources failed, using fallback list");
+    std::vector<std::string> fallback = {
+        "v2.0.5", "v2.0.4", "v2.0.3", "v2.0.2", "v2.0.1", "v2.0",
+    };
+    http_status = 0;
+    error_message = "GitHub/Gitee API unavailable; using fallback tag list";
+    return fallback;
+}
+
+std::string fetchLatestV2Tag(long& http_status, std::string& error_message) {
+    auto tags = fetchV2ReleaseTags(http_status, error_message);
+    if (tags.empty()) return {};
+    return tags[0];
 }
 
 }  // namespace shmtu::cas::ocr::gui

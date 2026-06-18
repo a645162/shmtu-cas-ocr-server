@@ -163,17 +163,35 @@ void print_json_array_item_prefix(const size_t index) {
 int run_cli(const CliConfig& config) {
     // ---- Subcommand dispatch ----
     if (config.input_path == "__subcmd_list_tags__") {
-        // List known v2 tags (we have a hard-coded list of known release tags)
-        std::printf("Available v2 release tags:\n");
-        for (const auto& tag : {"v2.0", "v2.0.1", "v2.0.2", "v2.0.3", "v2.0.4", "v2.0.5"}) {
-            std::printf("  %s\n", tag);
+        long http_status = 0;
+        std::string error_message;
+        const auto tags = shmtu::cas::ocr::gui::fetchV2ReleaseTags(http_status, error_message);
+        if (tags.empty()) {
+            std::fprintf(stderr, "Failed to fetch release tags: %s\n", error_message.c_str());
+            return 1;
+        }
+        std::printf("Available v2 release tags (newest first):\n");
+        for (const auto& tag : tags) {
+            std::printf("  %s\n", tag.c_str());
         }
         std::printf("\nUse 'list-models --tag <tag>' to see available models.\n");
         return 0;
     }
 
     if (config.input_path == "__subcmd_list_models__") {
-        const auto tag = config.v2_tag.empty() ? std::string("v2.0") : config.v2_tag;
+        std::string tag;
+        if (!config.v2_tag.empty()) {
+            tag = config.v2_tag;
+        } else {
+            long http_status = 0;
+            std::string error_message;
+            tag = shmtu::cas::ocr::gui::fetchLatestV2Tag(http_status, error_message);
+            if (tag.empty()) {
+                std::fprintf(stderr, "Failed to fetch latest tag: %s\n", error_message.c_str());
+                return 1;
+            }
+            std::printf("Using latest tag: %s\n", tag.c_str());
+        }
         std::printf("Fetching manifest for tag=%s...\n", tag.c_str());
         const std::string sources[] = {"github", "gitee"};
         for (const auto& source : sources) {
@@ -214,7 +232,7 @@ int run_cli(const CliConfig& config) {
         std::printf("  Version:   %s\n",
                     shmtu::cas::ocr::model_version_to_string(config.model_version).c_str());
         std::printf("  Tag:       %s\n",
-                    config.v2_tag.empty() ? "(auto: v2.0)" : config.v2_tag.c_str());
+                    config.v2_tag.empty() ? "(auto: latest)" : config.v2_tag.c_str());
         std::printf("  Backbone:  %s\n",
                     config.v2_backbone.empty() ? "(default)" : config.v2_backbone.c_str());
         std::printf("  Precision: %s\n", config.precision.c_str());
@@ -232,9 +250,19 @@ int run_cli(const CliConfig& config) {
         }
 
         // V2 download: fetch manifest, find model, download artifact
-        const auto tag = config.v2_tag.empty()
-                             ? std::string(shmtu::cas::ocr::gui::DEFAULT_RELEASE_TAG)
-                             : config.v2_tag;
+        std::string tag;
+        if (!config.v2_tag.empty()) {
+            tag = config.v2_tag;
+        } else {
+            long http_status = 0;
+            std::string err;
+            tag = shmtu::cas::ocr::gui::fetchLatestV2Tag(http_status, err);
+            if (tag.empty()) {
+                std::fprintf(stderr, "Failed to fetch latest tag: %s\n", err.c_str());
+                return 1;
+            }
+            std::printf("Using latest tag: %s\n", tag.c_str());
+        }
 
         std::string manifest_json;
         long http_status = 0;
@@ -276,7 +304,7 @@ int run_cli(const CliConfig& config) {
         }
 
         const bool ok = shmtu::cas::ocr::gui::downloadV2Artifact(
-            *target, "ncnn", config.precision, config.model_dir, use_gitee, nullptr,
+            *target, "ncnn", config.precision, config.model_dir, tag, use_gitee, nullptr,
             error_message);
 
         if (!ok) {

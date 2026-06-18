@@ -89,7 +89,7 @@ std::expected<CliConfig, std::string> parse_args(int argc, char* argv[]) {
     // ---- Subcommand: list-models ----
     auto* list_models_cmd = app.add_subcommand("list-models", "List models from a v2 release manifest");
     std::string lm_tag;
-    list_models_cmd->add_option("--tag", lm_tag, "Release tag, e.g. v2.0.5")->required();
+    list_models_cmd->add_option("--tag", lm_tag, "Release tag, e.g. v2.0.5 (default: latest)");
 
     // ---- Main OCR command options ----
     app.add_option("input", config.input_path, "Image path or directory");
