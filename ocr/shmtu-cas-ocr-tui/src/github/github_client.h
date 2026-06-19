@@ -23,10 +23,9 @@ struct ReleaseSummary {
 
 // GitHub/Gitee API client used by the TUI.
 //
-// We treat GitHub as the canonical source.  Gitee is supported
-// through the same `?per_page=...` query but the URL prefix is
-// configurable.  All requests are anonymous (the public release
-// endpoint allows 60 req/h/IP).
+// Gitee is the default (primary) source; GitHub is the fallback.
+// All requests are anonymous (the public release endpoint allows
+// 60 req/h/IP on GitHub; Gitee has a higher anonymous rate limit).
 class GitHubClient {
 public:
     // Default GitHub API base for the model repo.  Hard-coded because
@@ -42,9 +41,10 @@ public:
 
     GitHubClient();
 
-    // Fetch a list of releases.  `max_major` filters out releases
-    // whose semver major version exceeds it (defaults to 2 to match
-    // the project's v1/v2 manifest layout).
+    // Fetch a list of releases.  Tries Gitee first, then GitHub.
+    // `max_major` filters out releases whose semver major version
+    // exceeds it (defaults to 2 to match the project's v1/v2 manifest
+    // layout).
     //
     // On success returns the (newest-first) summary list and leaves
     // `error_message` empty.  On failure returns an empty vector and
@@ -55,7 +55,8 @@ public:
         std::string& error_message);
 
     // Fetch the `model-assets.json` manifest for a single release
-    // tag.  Returns an empty string on failure.
+    // tag.  Tries Gitee first, then GitHub.  Returns an empty string
+    // on failure.
     std::string fetchManifestJson(const std::string& tag,
                                   long& http_status,
                                   std::string& error_message);

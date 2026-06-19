@@ -155,33 +155,54 @@ std::vector<ReleaseSummary> GitHubClient::listReleases(
     int max_major, long& http_status, std::string& error_message) {
     std::vector<ReleaseSummary> releases;
     HttpClient http;
-    const std::string url =
-        std::string(kGitHubApiBase) + "/releases?per_page=100";
-    std::string body = http.getText(url, http_status, error_message);
-    if (body.empty()) {
-        return releases;
-    }
-    for (const auto& obj : findTopLevelObjects(body)) {
-        ReleaseSummary r;
-        r.tag = trim(extractStringField(obj, "tag_name"));
-        r.name = trim(extractStringField(obj, "name"));
-        r.published_at = trim(extractStringField(obj, "published_at"));
-        r.html_url = trim(extractStringField(obj, "html_url"));
-        r.prerelease = extractBoolField(obj, "prerelease");
-        r.draft = extractBoolField(obj, "draft");
-        if (r.tag.empty()) continue;
 
-        if (max_major > 0) {
-            auto sv = parseSemVer(r.tag);
-            if (sv && sv->major > max_major) continue;
+    // Try Gitee first, then fall back to GitHub.
+    const struct { const char* name; const char* base; } sources[] = {
+        {"gitee", kGiteeApiBase},
+        {"github", kGitHubApiBase},
+    };
+
+    for (const auto& src : sources) {
+        const std::string url =
+            std::string(src.base) + "/releases?per_page=100";
+        long status = 0;
+        std::string err;
+        std::string body = http.getText(url, status, err);
+        if (body.empty() || status != 200) {
+            http_status = status;
+            error_message = err;
+            continue;
         }
-        releases.push_back(std::move(r));
+
+        for (const auto& obj : findTopLevelObjects(body)) {
+            ReleaseSummary r;
+            r.tag = trim(extractStringField(obj, "tag_name"));
+            r.name = trim(extractStringField(obj, "name"));
+            r.published_at = trim(extractStringField(obj, "published_at"));
+            r.html_url = trim(extractStringField(obj, "html_url"));
+            r.prerelease = extractBoolField(obj, "prerelease");
+            r.draft = extractBoolField(obj, "draft");
+            if (r.tag.empty()) continue;
+
+            if (max_major > 0) {
+                auto sv = parseSemVer(r.tag);
+                if (sv && sv->major > max_major) continue;
+            }
+            releases.push_back(std::move(r));
+        }
+
+        if (!releases.empty()) {
+            // Sort newest first.
+            std::stable_sort(releases.begin(), releases.end(),
+                             [](const ReleaseSummary& a, const ReleaseSummary& b) {
+                                 return compareSemVerStrings(a.tag, b.tag) < 0;
+                             });
+            http_status = 200;
+            error_message.clear();
+            return releases;
+        }
     }
-    // Sort newest first.
-    std::stable_sort(releases.begin(), releases.end(),
-                     [](const ReleaseSummary& a, const ReleaseSummary& b) {
-                         return compareSemVerStrings(a.tag, b.tag) < 0;
-                     });
+
     return releases;
 }
 
@@ -189,9 +210,29 @@ std::string GitHubClient::fetchManifestJson(const std::string& tag,
                                             long& http_status,
                                             std::string& error_message) {
     HttpClient http;
-    const std::string url =
-        std::string(kGitHubReleasesBase) + "/" + tag + "/model-assets.json";
-    return http.getText(url, http_status, error_message);
+
+    // Try Gitee first, then fall back to GitHub.
+    const struct { const char* name; const char* base; } sources[] = {
+        {"gitee", kGiteeReleasesBase},
+        {"github", kGitHubReleasesBase},
+    };
+
+    for (const auto& src : sources) {
+        const std::string url =
+            std::string(src.base) + "/" + tag + "/model-assets.json";
+        long status = 0;
+        std::string err;
+        std::string body = http.getText(url, status, err);
+        if (!body.empty() && status == 200) {
+            http_status = status;
+            error_message.clear();
+            return body;
+        }
+        http_status = status;
+        error_message = err;
+    }
+
+    return {};
 }
 
 std::string GitHubClient::buildAssetUrl(const std::string& base,

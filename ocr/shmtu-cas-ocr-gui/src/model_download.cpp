@@ -614,10 +614,10 @@ bool isV2Tag(std::string_view tag) {
 
 std::vector<std::string> fetchV2ReleaseTags(long& http_status,
                                              std::string& error_message) {
-    // Try GitHub API first, then Gitee API.
+    // Try Gitee API first, then GitHub API.
     const struct { const char* name; const char* url; } sources[] = {
-        {"github", GITHUB_API_BASE},
         {"gitee",  "https://gitee.com/api/v5/repos/a645162/shmtu-cas-ocr-model"},
+        {"github", GITHUB_API_BASE},
     };
 
     for (const auto& src : sources) {
@@ -669,7 +669,7 @@ std::vector<std::string> fetchV2ReleaseTags(long& http_status,
         "v2.0.5", "v2.0.4", "v2.0.3", "v2.0.2", "v2.0.1", "v2.0",
     };
     http_status = 0;
-    error_message = "GitHub/Gitee API unavailable; using fallback tag list";
+    error_message = "Gitee/GitHub API unavailable; using fallback tag list";
     return fallback;
 }
 

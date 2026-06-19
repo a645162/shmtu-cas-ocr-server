@@ -32,6 +32,11 @@ struct ServerConfig {
     int log_cleanup_interval_secs = 3600;
     int log_retention_days = 7;
 
+    /// Model download source: "gitee" (default) or "github".
+    /// Controls which mirror is tried first when auto-downloading v2 models.
+    /// Set via SHMTU_MODEL_SOURCE env var or --model-source CLI option.
+    std::string model_source = "gitee";
+
     std::string server_name;
 };
 

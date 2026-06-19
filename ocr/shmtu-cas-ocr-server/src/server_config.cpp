@@ -82,6 +82,17 @@ std::expected<void, std::string> apply_env_overrides(
         record_override(std::string("SHMTU_MODEL_VERSION=") +
                         model_version_to_string(config.model_version));
     }
+    if (const char* value = std::getenv("SHMTU_MODEL_SOURCE")) {
+        std::string src = value;
+        if (src == "gitee" || src == "github") {
+            config.model_source = src;
+            record_override("SHMTU_MODEL_SOURCE=" + config.model_source);
+        } else {
+            return std::unexpected(
+                "Invalid value for SHMTU_MODEL_SOURCE: " + src +
+                " (expected \"gitee\" or \"github\")");
+        }
+    }
     if (const char* value = std::getenv("SHMTU_SERVER_NAME")) {
         config.server_name = value;
         record_override("SHMTU_SERVER_NAME=" + config.server_name);
@@ -203,7 +214,7 @@ std::expected<ServerConfig, std::string> parse_server_config(
         "Environment:\n"
         "  SHMTU_HTTP_HOST SHMTU_HTTP_PORT SHMTU_TCP_HOST SHMTU_TCP_PORT\n"
         "  SHMTU_MODEL_DIR SHMTU_PRECISION SHMTU_MODEL_VERSION\n"
-        "  SHMTU_USE_GPU SHMTU_SERVER_NAME\n"
+        "  SHMTU_MODEL_SOURCE SHMTU_USE_GPU SHMTU_SERVER_NAME\n"
         "  SHMTU_WORKERS SHMTU_QUEUE_CAPACITY SHMTU_NCNN_THREADS\n"
         "  SHMTU_LOG_DIR SHMTU_LOG_FILE_PREFIX SHMTU_LOG_MIN_LEVEL\n"
         "  SHMTU_LOG_TO_STDERR SHMTU_LOG_ALSO_TO_STDERR SHMTU_LOG_MAX_SIZE_MB\n"
@@ -237,6 +248,10 @@ std::expected<ServerConfig, std::string> parse_server_config(
     app.add_option("--queue-capacity", config.queue_capacity, "Max pending requests (0 = auto)")
         ->capture_default_str()
         ->check(CLI::Range(0, kIntMax));
+    app.add_option("--model-source", config.model_source,
+                   "Model download source: gitee (default) or github")
+        ->capture_default_str()
+        ->check(CLI::IsMember(std::set<std::string>{"gitee", "github"}));
     app.add_option("--server-name", config.server_name, "Logical server name")->capture_default_str();
     app.add_option("--log-dir", config.log_dir, "Log directory")->capture_default_str();
     app.add_option("--log-file-prefix", config.log_file_prefix, "Log file prefix")->capture_default_str();
@@ -329,6 +344,7 @@ void print_runtime_configuration(const ServerConfig& config) {
     std::printf("  NCNN threads:   %d\n", config.inference_threads);
     std::printf("  Use GPU:        %s\n", config.use_gpu ? "true" : "false");
     std::printf("  Queue capacity: %d\n", config.queue_capacity);
+    std::printf("  Model source:   %s\n", config.model_source.c_str());
     std::printf("  Log dir:        %s\n", config.log_dir.c_str());
     std::printf("  Log prefix:     %s\n", config.log_file_prefix.c_str());
     std::printf("  Log level:      %d\n", config.log_min_level);

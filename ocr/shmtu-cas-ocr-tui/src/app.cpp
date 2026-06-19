@@ -22,10 +22,17 @@ using tui_components::statusLine;
 namespace {
 
 bool useGiteeFromEnv() {
-    if (const char* v = std::getenv("SHMTU_USE_GITEE"); v && *v && v[0] != '0') {
-        return true;
+    // Primary: SHMTU_MODEL_SOURCE=gitee|github (same as server/docker-compose).
+    if (const char* src = std::getenv("SHMTU_MODEL_SOURCE")) {
+        std::string_view sv(src);
+        if (sv == "github") return false;
+        if (sv == "gitee") return true;
     }
-    return false;
+    // Legacy: SHMTU_USE_GITEE=0 → github, anything else → gitee (default).
+    if (const char* v = std::getenv("SHMTU_USE_GITEE"); v && *v && v[0] == '0') {
+        return false;
+    }
+    return true;
 }
 
 }  // namespace
@@ -159,10 +166,10 @@ void App::startRefreshWorker() {
         std::string err;
         auto releases = github_.listReleases(2, http_status, err);
         if (http_status != 200) {
-            setStatus("GitHub list failed: HTTP " +
+            setStatus("API list failed: HTTP " +
                       std::to_string(http_status) + " - " + err);
         } else if (releases.empty()) {
-            setStatus("GitHub returned no v2 releases.");
+            setStatus("No v2 releases found.");
         } else {
             // Fetch manifest summaries to populate model_count for each tag.
             for (auto& r : releases) {

@@ -76,8 +76,12 @@ int OcrServer::run() {
             std::printf("Latest v2 tag: %s\n", tag.c_str());
 
             // Fetch manifest
+            // Determine primary/fallback download sources from config.
+            const bool gitee_first = (cfg.model_source == "gitee");
+            const auto primary_source = gitee_first ? "gitee" : "github";
+            const auto fallback_source = gitee_first ? "github" : "gitee";
             std::string manifest_json;
-            for (const auto& source : {"github", "gitee"}) {
+            for (const auto& source : {primary_source, fallback_source}) {
                 long ms = 0;
                 std::string me;
                 manifest_json = gui::downloadReleaseManifest(source, tag, ms, me);
@@ -101,7 +105,7 @@ int OcrServer::run() {
             std::printf("Downloading model: %s (backbone=%s, precision=%s)\n",
                         model.display_name.c_str(), model.backbone.c_str(), cfg.precision.c_str());
             const bool ok = gui::downloadV2Artifact(
-                model, "ncnn", cfg.precision, cfg.model_dir, tag, false, nullptr, error_message);
+                model, "ncnn", cfg.precision, cfg.model_dir, tag, gitee_first, nullptr, error_message);
             if (!ok) {
                 std::fprintf(stderr, "Auto-download failed: %s\n", error_message.c_str());
                 LOG(ERROR) << "Auto-download failed: " << error_message;

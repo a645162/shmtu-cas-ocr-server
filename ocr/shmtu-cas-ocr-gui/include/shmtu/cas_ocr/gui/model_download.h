@@ -34,13 +34,16 @@ bool downloadUrlToMemory(const std::string& url,
 // v2 manifest-driven downloads
 // --------------------------------------------------------------------------
 
-// Release tag (e.g. "v2.0") appended to the GitHub/Gitee base URL.
-constexpr auto DEFAULT_RELEASE_TAG = "v2.0";
+// Default release tag for v2 model downloads.
+constexpr auto DEFAULT_RELEASE_TAG = "v2.0.5";
 
 constexpr auto GITHUB_RELEASES_BASE_URL =
     "https://github.com/a645162/shmtu-cas-ocr-model/releases/download";
 constexpr auto GITEE_RELEASES_BASE_URL =
     "https://gitee.com/a645162/shmtu-cas-ocr-model/releases/download";
+
+constexpr auto GITEE_API_BASE =
+    "https://gitee.com/api/v5/repos/a645162/shmtu-cas-ocr-model";
 
 // Build a release-asset URL for a given base (github or gitee).
 //   base: "github" or "gitee" (case-insensitive).
@@ -61,9 +64,9 @@ std::string downloadReleaseManifest(const std::string& base,
 
 // Download one (engine, precision) artifact for a specific model from a
 // parsed manifest into `dest_dir`.  SHA256 digests in the manifest are
-// verified when present; files are downloaded from GitHub first, with a
-// Gitee fallback.  `use_gitee_first` swaps the primary source.  Returns
-// false if any file fails after all retries.
+// verified when present; files are downloaded from Gitee first (default),
+// with a GitHub fallback.  `use_gitee_first` swaps the primary source.
+// Returns false if any file fails after all retries.
 // `bytes_progress_cb` (optional) is invoked during each individual
 // download to drive a UI progress bar.
 bool downloadV2Artifact(const shmtu::cas::ocr::ModelInfo& model,
@@ -86,12 +89,13 @@ bool downloadV2Artifact(const shmtu::cas::ocr::ModelInfo& model,
                         const DownloadBytesProgressCallback& bytes_progress_cb,
                         std::string& error_message);
 
-// Fetch the list of v2 release tags from GitHub, sorted newest-first.
-// Filters to tags matching "v2.*".  Returns empty vector on failure.
+// Fetch the list of v2 release tags from Gitee (primary) then GitHub, sorted
+// newest-first.  Filters to tags matching "v2.*".  Returns empty vector on
+// failure.
 std::vector<std::string> fetchV2ReleaseTags(long& http_status,
                                              std::string& error_message);
 
-// Fetch the latest v2 release tag from GitHub.
+// Fetch the latest v2 release tag (Gitee primary, GitHub fallback).
 // Returns empty string on failure.
 std::string fetchLatestV2Tag(long& http_status, std::string& error_message);
 
