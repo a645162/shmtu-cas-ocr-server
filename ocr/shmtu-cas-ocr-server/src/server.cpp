@@ -1,4 +1,5 @@
 #include <shmtu/cas_ocr/server.h>
+#include <shmtu/cas_ocr/gui/model_download.h>
 
 #include "server_internal.h"
 #include "logging.h"
@@ -56,6 +57,61 @@ int OcrServer::run() {
                 cfg.worker_count,
                 cfg.inference_threads,
                 cfg.queue_capacity);
+
+    // Auto-download v2 model if missing
+    if (cfg.model_version == ModelVersion::V2) {
+        auto test_ocr = std::make_unique<CasOcr>(cfg.model_dir);
+        if (!test_ocr->load_model(cfg.precision, cfg.use_gpu, cfg.inference_threads, ModelVersion::V2)) {
+            std::printf("V2 model not found locally, attempting auto-download...\n");
+            LOG(INFO) << "V2 model missing, starting auto-download";
+
+            long http_status = 0;
+            std::string error_message;
+            auto tag = gui::fetchLatestV2Tag(http_status, error_message);
+            if (tag.empty()) {
+                std::fprintf(stderr, "Failed to fetch latest v2 tag: %s\n", error_message.c_str());
+                LOG(ERROR) << "Auto-download failed: cannot determine latest tag";
+                return -1;
+            }
+            std::printf("Latest v2 tag: %s\n", tag.c_str());
+
+            // Fetch manifest
+            std::string manifest_json;
+            for (const auto& source : {"github", "gitee"}) {
+                long ms = 0;
+                std::string me;
+                manifest_json = gui::downloadReleaseManifest(source, tag, ms, me);
+                if (!manifest_json.empty() && ms == 200) break;
+            }
+            if (manifest_json.empty()) {
+                std::fprintf(stderr, "Failed to fetch manifest for tag=%s\n", tag.c_str());
+                LOG(ERROR) << "Auto-download failed: cannot fetch manifest";
+                return -1;
+            }
+
+            auto manifest = parse_release_manifest(manifest_json);
+            if (manifest.models.empty()) {
+                std::fprintf(stderr, "Manifest empty or parse error\n");
+                LOG(ERROR) << "Auto-download failed: empty manifest";
+                return -1;
+            }
+
+            // Download first model (default backbone)
+            const auto& model = manifest.models[0];
+            std::printf("Downloading model: %s (backbone=%s, precision=%s)\n",
+                        model.display_name.c_str(), model.backbone.c_str(), cfg.precision.c_str());
+            const bool ok = gui::downloadV2Artifact(
+                model, "ncnn", cfg.precision, cfg.model_dir, tag, false, nullptr, error_message);
+            if (!ok) {
+                std::fprintf(stderr, "Auto-download failed: %s\n", error_message.c_str());
+                LOG(ERROR) << "Auto-download failed: " << error_message;
+                return -1;
+            }
+            std::printf("Model downloaded successfully to: %s\n", cfg.model_dir.c_str());
+            LOG(INFO) << "V2 model auto-download completed";
+        }
+        test_ocr.reset();
+    }
 
     for (int i = 0; i < cfg.worker_count; ++i) {
         LOG(INFO) << "Initializing worker " << i << " of " << cfg.worker_count;

@@ -1,5 +1,6 @@
 #include <shmtu/cas_ocr/cas_ocr.h>
 #include <shmtu/cas_ocr/version.h>
+#include <shmtu/cas_ocr/manifest.h>
 
 #include "v1_engine.h"
 #include "v2_engine.h"
@@ -78,19 +79,26 @@ std::string resolve_v1_dir(const std::string& root, const std::string& basename,
 // Resolve the directory that holds a given V2 weight.
 //   * Prefer <root>/v2/<stem>.<precision>.<ext>
 //   * Fall back to <root>/<stem>.<precision>.<ext>
+// Scans all known v2 asset stems via infer_asset_stem_from_dir.
 std::string resolve_v2_dir(const std::string& root, const std::string& precision) {
-    const std::string stem = "mobilenet_v3_small.trislot_decoder.v2_0";
-    const std::string v2_dir = root + "/v2/";
-    const std::string legacy = root + "/";
-    const std::string v2_param = v2_dir + stem + "." + precision + ".param";
-    const std::string v2_bin = v2_dir + stem + "." + precision + ".bin";
-    if (file_exists(v2_param) && file_exists(v2_bin)) {
-        return v2_dir;
+    // Try <root>/v2/ first (preferred layout)
+    auto stem = infer_asset_stem_from_dir(root + "/v2/");
+    if (!stem.empty()) {
+        const std::string dir = root + "/v2/";
+        const std::string param = dir + stem + "." + precision + ".param";
+        const std::string bin   = dir + stem + "." + precision + ".bin";
+        if (file_exists(param) && file_exists(bin)) {
+            return dir;
+        }
     }
-    const std::string legacy_param = legacy + stem + "." + precision + ".param";
-    const std::string legacy_bin = legacy + stem + "." + precision + ".bin";
-    if (file_exists(legacy_param) && file_exists(legacy_bin)) {
-        return legacy;
+    // Fallback: flat layout under <root>/
+    stem = infer_asset_stem_from_dir(root);
+    if (!stem.empty()) {
+        const std::string param = root + "/" + stem + "." + precision + ".param";
+        const std::string bin   = root + "/" + stem + "." + precision + ".bin";
+        if (file_exists(param) && file_exists(bin)) {
+            return root + "/";
+        }
     }
     return {};
 }

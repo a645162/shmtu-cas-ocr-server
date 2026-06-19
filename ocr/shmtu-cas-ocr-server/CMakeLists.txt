@@ -22,6 +22,8 @@ set(SERVER_SOURCES
     src/server_http.cpp
     src/server_tcp.cpp
     src/server_worker_pool.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/../shmtu-cas-ocr-gui/src/model_download.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/../shmtu-cas-ocr-gui/src/logging.cpp
 )
 
 add_executable(shmtu_cas_ocr_server ${SERVER_SOURCES})
@@ -34,6 +36,7 @@ shmtu_apply_target_version(
 target_include_directories(shmtu_cas_ocr_server
     PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/include
+        ${CMAKE_CURRENT_SOURCE_DIR}/../shmtu-cas-ocr-gui/include
 )
 
 target_link_libraries(shmtu_cas_ocr_server
