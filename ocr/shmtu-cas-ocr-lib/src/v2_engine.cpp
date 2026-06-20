@@ -102,6 +102,44 @@ int argmax(const ncnn::Mat& m) {
     return best;
 }
 
+cv::Mat preprocess_v2_input(const cv::Mat& bgr_image) {
+    // Align with Model/.../common/preprocess.py default "min_channel_otsu".
+    cv::Mat score;
+    if (bgr_image.channels() == 3) {
+        std::vector<cv::Mat> channels;
+        cv::split(bgr_image, channels);
+        cv::Mat min_bg;
+        cv::min(channels[0], channels[1], min_bg);
+        cv::Mat min_bgr;
+        cv::min(min_bg, channels[2], min_bgr);
+        score = cv::Scalar::all(255) - min_bgr;
+    } else if (bgr_image.channels() == 4) {
+        std::vector<cv::Mat> channels;
+        cv::split(bgr_image, channels);
+        cv::Mat min_bg;
+        cv::min(channels[0], channels[1], min_bg);
+        cv::Mat min_bgr;
+        cv::min(min_bg, channels[2], min_bgr);
+        score = cv::Scalar::all(255) - min_bgr;
+    } else if (bgr_image.channels() == 1) {
+        score = bgr_image.clone();
+    } else {
+        cv::Mat gray;
+        cv::cvtColor(bgr_image, gray, cv::COLOR_BGR2GRAY);
+        score = gray;
+    }
+
+    cv::Mat blur;
+    cv::GaussianBlur(score, blur, cv::Size(3, 3), 0.0);
+
+    cv::Mat binary;
+    cv::threshold(blur, binary, 0, 255, cv::THRESH_BINARY | cv::THRESH_OTSU);
+
+    cv::Mat resized;
+    cv::resize(binary, resized, cv::Size(kInputWidth, kInputHeight), 0.0, 0.0, cv::INTER_NEAREST);
+    return resized;
+}
+
 }  // namespace
 
 struct V2Engine::Impl {
@@ -155,9 +193,7 @@ struct V2Engine::Impl {
         PredictResult result;
         result.model_version = static_cast<int>(ModelVersion::V2);
         try {
-            cv::Mat gray;
-            cv::cvtColor(bgr_image, gray, cv::COLOR_BGR2GRAY);
-            cv::resize(gray, gray, cv::Size(kInputWidth, kInputHeight));
+            cv::Mat gray = preprocess_v2_input(bgr_image);
 
             // Grayscale normalization to [0, 1]: mean=0, scale=1/255.
             ncnn::Mat in = ncnn::Mat::from_pixels(

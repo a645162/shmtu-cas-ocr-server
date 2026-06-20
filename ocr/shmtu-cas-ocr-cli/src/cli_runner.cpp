@@ -19,6 +19,17 @@ namespace shmtu::cas::ocr::cli {
 
 namespace {
 
+const char* model_version_label(int version) {
+    switch (version) {
+        case static_cast<int>(shmtu::cas::ocr::ModelVersion::V1):
+            return "v1";
+        case static_cast<int>(shmtu::cas::ocr::ModelVersion::V2):
+            return "v2";
+        default:
+            return "unknown";
+    }
+}
+
 bool compare_results_match(const CompareEntry& entry) {
     return entry.local_ok && entry.remote_ok &&
            entry.local_result.expression == entry.remote_result.expression &&
@@ -47,7 +58,11 @@ void process_image_local(shmtu::cas::ocr::CasOcr& ocr,
     }
 
     if (result.success) {
-        std::printf("[%s] %s  =>  %d\n", path.c_str(), result.expression.c_str(), result.result);
+        std::printf("[%s] (%s) %s  =>  %d\n",
+                    path.c_str(),
+                    model_version_label(result.model_version),
+                    result.expression.c_str(),
+                    result.result);
     } else {
         std::fprintf(stderr, "[%s] ERROR: %s\n", path.c_str(), result.error.c_str());
     }
@@ -330,7 +345,8 @@ int run_cli(const CliConfig& config) {
             std::fprintf(stderr, "Failed to load models.\n");
             return 1;
         }
-        std::printf("Model loaded (%s).\n\n",
+        std::printf("Model loaded (version=%s, device=%s).\n\n",
+                    shmtu::cas::ocr::model_version_to_string(ocr->model_version()).c_str(),
                     ocr->model_status() == shmtu::cas::ocr::ModelStatus::LoadedGPU ? "GPU" : "CPU");
     }
 
