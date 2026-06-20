@@ -1,6 +1,7 @@
 #pragma once
 
 #include <shmtu/cas_ocr/gui/launch_options.h>
+#include <shmtu/cas_ocr/manifest.h>
 #include <shmtu/cas_ocr/types.h>
 
 #include <QMainWindow>
@@ -12,6 +13,7 @@
 
 class QCheckBox;
 class QComboBox;
+class QDialog;
 class QFrame;
 class QGroupBox;
 class QHBoxLayout;
@@ -21,6 +23,7 @@ class QPushButton;
 class QProgressBar;
 class QResizeEvent;
 class QScrollArea;
+class QTableWidget;
 class QToolButton;
 class QVBoxLayout;
 class QWidget;
@@ -32,6 +35,16 @@ class CasOcr;
 namespace shmtu::cas::ocr::gui {
 
 class ImageView;
+
+// Information about a locally discovered NCNN model pair (.param + .bin).
+struct LocalModelEntry {
+    std::string param_path;       // absolute path to .param
+    std::string bin_path;         // absolute path to .bin
+    std::string display_name;     // human-readable name (filename stem)
+    std::string version_hint;     // "v1" or "v2" if inferable, else empty
+    std::string backbone_hint;    // backbone name if inferable from filename
+    std::string precision_hint;   // "fp16" or "fp32" if inferable
+};
 
 class MainWindow final : public QMainWindow {
 public:
@@ -71,6 +84,17 @@ private:
     void updateModelStatusUi();
     void updateV2ModelSettings();
 
+    // Tag browsing & model listing
+    void onFetchTags();
+    void onTagSelected(int index);
+    void onRefreshModelsForTag();
+    void populateModelTable(const shmtu::cas::ocr::ReleaseManifest& manifest);
+
+    // Local model scanning & selection
+    void onScanLocalModels();
+    std::vector<LocalModelEntry> scanLocalModels(const std::string& model_dir) const;
+    void onLocalModelLoad(int row);
+
     void onDownloadCaptcha();
     void onOpenLocalImage();
     void onOcrRecognize();
@@ -102,6 +126,13 @@ private:
     bool model_loaded_ = false;
     bool download_active_ = false;
 
+    // Cached tag list & manifest for the selected tag
+    std::vector<std::string> cached_tags_;
+    shmtu::cas::ocr::ReleaseManifest cached_manifest_;
+
+    // Cached local model scan results
+    std::vector<LocalModelEntry> cached_local_models_;
+
     QString current_image_path_;
     QString current_image_source_name_;
     std::vector<uint8_t> current_image_data_;
@@ -112,6 +143,17 @@ private:
     QPushButton* check_download_button_ = nullptr;
     QLabel* model_status_label_ = nullptr;
     QProgressBar* download_progress_bar_ = nullptr;
+
+    // Tag browsing widgets
+    QComboBox* tag_combo_ = nullptr;
+    QPushButton* fetch_tags_button_ = nullptr;
+    QPushButton* refresh_models_button_ = nullptr;
+    QTableWidget* model_table_ = nullptr;
+    QWidget* tag_row_widget_ = nullptr;
+
+    // Local model scanning widgets
+    QPushButton* scan_local_button_ = nullptr;
+    QTableWidget* local_model_table_ = nullptr;
 
     QWidget* main_panel_ = nullptr;
     ImageView* preview_label_ = nullptr;

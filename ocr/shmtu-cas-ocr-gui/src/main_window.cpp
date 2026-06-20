@@ -1,6 +1,7 @@
 #include <shmtu/cas_ocr/gui/main_window.h>
 
 #include <shmtu/cas_ocr/cas_ocr.h>
+#include <shmtu/cas_ocr/manifest.h>
 #include <shmtu/cas_ocr/version.h>
 #include <shmtu/cas_ocr/gui/image_view.h>
 #include <shmtu/cas_ocr/gui/launch_options.h>
@@ -42,6 +43,7 @@
 #include <cmath>
 #include <filesystem>
 #include <fstream>
+#include <map>
 #include <memory>
 #include <sstream>
 #include <string>
@@ -463,6 +465,73 @@ void MainWindow::buildTopBar(QVBoxLayout* root_layout) {
 
     panel_layout->addLayout(version_row);
 
+    // --- Tag browsing row (V2 only) ---
+    tag_row_widget_ = new QWidget(top_bar_panel_);
+    auto* tag_row = new QHBoxLayout(tag_row_widget_);
+    tag_row->setContentsMargins(0, 0, 0, 0);
+    tag_row->setSpacing(8);
+
+    tag_row->addWidget(createDimLabel(qs("Release Tag:"), top_bar_panel_));
+
+    tag_combo_ = new QComboBox(top_bar_panel_);
+    tag_combo_->setMinimumWidth(140);
+    if (!current_v2_tag_.empty()) {
+        tag_combo_->addItem(QString::fromStdString(current_v2_tag_));
+    } else {
+        tag_combo_->addItem(qs("（点击获取标签列表）"));
+    }
+    tag_combo_->setToolTip(qs("选择 V2 模型的 Release 标签版本"));
+    tag_row->addWidget(tag_combo_);
+
+    fetch_tags_button_ = new QPushButton(qs("获取标签"), top_bar_panel_);
+    fetch_tags_button_->setToolTip(qs("从 GitHub/Gitee 获取可用的 V2 Release 标签"));
+    tag_row->addWidget(fetch_tags_button_);
+
+    refresh_models_button_ = new QPushButton(qs("刷新模型列表"), top_bar_panel_);
+    refresh_models_button_->setToolTip(qs("获取当前标签的模型清单"));
+    tag_row->addWidget(refresh_models_button_);
+
+    tag_row->addStretch(1);
+    tag_row_widget_->setVisible(current_model_version_ == shmtu::cas::ocr::ModelVersion::V2);
+    panel_layout->addWidget(tag_row_widget_);
+
+    // --- V2 model table (shows models for the selected tag) ---
+    model_table_ = new QTableWidget(0, 5, top_bar_panel_);
+    model_table_->setHorizontalHeaderLabels(
+        QStringList() << qs("模型名称") << qs("Backbone") << qs("版本")
+                      << qs("参数量(M)") << qs("Val Acc"));
+    model_table_->horizontalHeader()->setStretchLastSection(true);
+    model_table_->horizontalHeader()->setSectionResizeMode(0, QHeaderView::Stretch);
+    model_table_->setEditTriggers(QAbstractItemView::NoEditTriggers);
+    model_table_->setSelectionBehavior(QAbstractItemView::SelectRows);
+    model_table_->setMaximumHeight(150);
+    model_table_->setVerticalScrollBarPolicy(Qt::ScrollBarAsNeeded);
+    model_table_->setVisible(current_model_version_ == shmtu::cas::ocr::ModelVersion::V2);
+    panel_layout->addWidget(model_table_);
+
+    // --- Local model scanning ---
+    auto* local_row = new QHBoxLayout();
+    local_row->setSpacing(8);
+
+    scan_local_button_ = new QPushButton(qs("扫描本地模型"), top_bar_panel_);
+    scan_local_button_->setToolTip(qs("扫描模型目录中所有已下载的 NCNN 模型文件"));
+    local_row->addWidget(scan_local_button_);
+    local_row->addStretch(1);
+
+    panel_layout->addLayout(local_row);
+
+    local_model_table_ = new QTableWidget(0, 5, top_bar_panel_);
+    local_model_table_->setHorizontalHeaderLabels(
+        QStringList() << qs("模型名") << qs("版本") << qs("Backbone")
+                      << qs("精度") << qs("操作"));
+    local_model_table_->horizontalHeader()->setStretchLastSection(true);
+    local_model_table_->horizontalHeader()->setSectionResizeMode(0, QHeaderView::Stretch);
+    local_model_table_->setEditTriggers(QAbstractItemView::NoEditTriggers);
+    local_model_table_->setSelectionBehavior(QAbstractItemView::SelectRows);
+    local_model_table_->setMaximumHeight(150);
+    local_model_table_->setVerticalScrollBarPolicy(Qt::ScrollBarAsNeeded);
+    panel_layout->addWidget(local_model_table_);
+
     // --- Option row ---
     auto* option_row = new QHBoxLayout();
     option_row->setSpacing(8);
@@ -520,6 +589,14 @@ void MainWindow::buildTopBar(QVBoxLayout* root_layout) {
             setStatusText(gpuStatusText(detectGpuAvailability(), checked));
         }
     });
+    connect(fetch_tags_button_, &QPushButton::clicked, this,
+            [this]() { onFetchTags(); });
+    connect(tag_combo_, &QComboBox::currentIndexChanged, this,
+            &MainWindow::onTagSelected);
+    connect(refresh_models_button_, &QPushButton::clicked, this,
+            [this]() { onRefreshModelsForTag(); });
+    connect(scan_local_button_, &QPushButton::clicked, this,
+            [this]() { onScanLocalModels(); });
 }
 
 void MainWindow::buildMainArea(QVBoxLayout* root_layout) {
@@ -961,6 +1038,8 @@ void MainWindow::onModelVersionChanged(int index) {
     const bool is_v2 = (current_model_version_ == shmtu::cas::ocr::ModelVersion::V2);
     if (download_v2_button_) download_v2_button_->setVisible(is_v2);
     if (v2_model_label_) v2_model_label_->setVisible(is_v2);
+    if (tag_row_widget_) tag_row_widget_->setVisible(is_v2);
+    if (model_table_) model_table_->setVisible(is_v2);
 
     switch (current_model_version_) {
         case shmtu::cas::ocr::ModelVersion::V2:
@@ -1608,6 +1687,311 @@ void MainWindow::setStatusText(const QString& text) {
         status_label_->setText(text);
     }
     logMessage("setStatusText: " + text.toStdString());
+}
+
+// --------------------------------------------------------------------------
+// Tag browsing & model listing
+// --------------------------------------------------------------------------
+
+void MainWindow::onFetchTags() {
+    logMessage("onFetchTags: fetching v2 release tags");
+    setStatusText(qs("正在获取 V2 Release 标签..."));
+    QApplication::processEvents();
+
+    long http_status = 0;
+    std::string error_message;
+    auto tags = fetchV2ReleaseTags(http_status, error_message);
+
+    if (tags.empty()) {
+        logMessage("onFetchTags: no tags returned, status=" +
+                   std::to_string(http_status) + ", error=" + error_message);
+        setStatusText(qs("获取标签列表失败"));
+        QMessageBox::warning(this, qs("获取标签"),
+                             qs("无法获取 V2 Release 标签列表。\n") +
+                             QString::fromStdString(error_message));
+        return;
+    }
+
+    cached_tags_ = std::move(tags);
+
+    // Populate the combo box
+    const auto prev_tag = tag_combo_->currentText().toStdString();
+    tag_combo_->blockSignals(true);
+    tag_combo_->clear();
+    for (const auto& tag : cached_tags_) {
+        tag_combo_->addItem(QString::fromStdString(tag));
+    }
+    // Restore previous selection if it still exists
+    int found_index = -1;
+    for (int i = 0; i < tag_combo_->count(); ++i) {
+        if (tag_combo_->itemText(i).toStdString() == prev_tag) {
+            found_index = i;
+            break;
+        }
+    }
+    if (found_index >= 0) {
+        tag_combo_->setCurrentIndex(found_index);
+    }
+    tag_combo_->blockSignals(false);
+
+    logMessage("onFetchTags: found " + std::to_string(cached_tags_.size()) + " tags");
+    setStatusText(qs("已获取 ") + QString::number(cached_tags_.size()) + qs(" 个标签"));
+
+    // Auto-refresh models for the current tag
+    onRefreshModelsForTag();
+}
+
+void MainWindow::onTagSelected(int index) {
+    if (index < 0 || !tag_combo_) return;
+
+    const auto tag = tag_combo_->itemText(index).toStdString();
+    logMessage("onTagSelected: tag=" + tag);
+
+    if (!tag.empty() && tag.front() == 'v') {
+        current_v2_tag_ = tag;
+        updateV2ModelSettings();
+        setStatusText(qs("已选择标签: ") + QString::fromStdString(tag));
+    }
+}
+
+void MainWindow::onRefreshModelsForTag() {
+    if (!tag_combo_) return;
+
+    const auto tag_text = tag_combo_->currentText().toStdString();
+    if (tag_text.empty() || tag_text.front() != 'v') {
+        setStatusText(qs("请先选择一个有效的 V2 标签"));
+        return;
+    }
+
+    const auto tag = tag_text;
+    logMessage("onRefreshModelsForTag: fetching manifest for tag=" + tag);
+    setStatusText(qs("正在获取模型清单..."));
+    QApplication::processEvents();
+
+    // Try Gitee first, then GitHub
+    const char* sources[] = {"gitee", "github"};
+    long http_status = 0;
+    std::string error_message;
+    std::string manifest_json;
+
+    for (const auto* source : sources) {
+        manifest_json = downloadReleaseManifest(source, tag, http_status, error_message);
+        if (!manifest_json.empty()) {
+            logMessage("onRefreshModelsForTag: manifest fetched via " +
+                       std::string(source));
+            break;
+        }
+    }
+
+    if (manifest_json.empty()) {
+        logMessage("onRefreshModelsForTag: manifest download failed, status=" +
+                   std::to_string(http_status) + ", error=" + error_message);
+        setStatusText(qs("获取模型清单失败"));
+        QMessageBox::warning(this, qs("模型清单"),
+                             qs("无法获取模型清单：\n") +
+                             QString::fromStdString(error_message));
+        return;
+    }
+
+    cached_manifest_ = shmtu::cas::ocr::parse_release_manifest(manifest_json);
+    if (cached_manifest_.models.empty()) {
+        logMessage("onRefreshModelsForTag: manifest parse failed or empty");
+        setStatusText(qs("模型清单解析失败或为空"));
+        return;
+    }
+
+    populateModelTable(cached_manifest_);
+
+    // Also update current_v2_tag_ to match the selected tag
+    current_v2_tag_ = tag;
+    updateV2ModelSettings();
+
+    logMessage("onRefreshModelsForTag: loaded " +
+               std::to_string(cached_manifest_.models.size()) + " models");
+    setStatusText(qs("已加载 ") + QString::number(cached_manifest_.models.size()) +
+                  qs(" 个模型 (") + QString::fromStdString(tag) + qs(")"));
+}
+
+void MainWindow::populateModelTable(const shmtu::cas::ocr::ReleaseManifest& manifest) {
+    if (!model_table_) return;
+
+    model_table_->setRowCount(static_cast<int>(manifest.models.size()));
+
+    for (int row = 0; row < static_cast<int>(manifest.models.size()); ++row) {
+        const auto& model = manifest.models[row];
+
+        auto* name_item = new QTableWidgetItem(QString::fromStdString(model.display_name));
+        model_table_->setItem(row, 0, name_item);
+
+        auto* backbone_item = new QTableWidgetItem(QString::fromStdString(model.backbone));
+        model_table_->setItem(row, 1, backbone_item);
+
+        auto* version_item = new QTableWidgetItem(QString::fromStdString(model.version));
+        model_table_->setItem(row, 2, version_item);
+
+        QString size_str;
+        if (model.model_size_m.has_value()) {
+            size_str = QString::number(*model.model_size_m, 'f', 1);
+        }
+        auto* size_item = new QTableWidgetItem(size_str);
+        model_table_->setItem(row, 3, size_item);
+
+        QString acc_str;
+        if (model.metrics.has_value() && model.metrics->val_acc_expression.has_value()) {
+            acc_str = QString::number(*model.metrics->val_acc_expression * 100.0, 'f', 2) + "%";
+        }
+        auto* acc_item = new QTableWidgetItem(acc_str);
+        model_table_->setItem(row, 4, acc_item);
+    }
+
+    model_table_->resizeColumnsToContents();
+}
+
+// --------------------------------------------------------------------------
+// Local model scanning & selection
+// --------------------------------------------------------------------------
+
+void MainWindow::onScanLocalModels() {
+    const auto model_dir = model_dir_edit_->text().toStdString();
+    logMessage("onScanLocalModels: scanning dir=" + model_dir);
+
+    cached_local_models_ = scanLocalModels(model_dir);
+    logMessage("onScanLocalModels: found " +
+               std::to_string(cached_local_models_.size()) + " local models");
+
+    if (!local_model_table_) return;
+
+    local_model_table_->setRowCount(static_cast<int>(cached_local_models_.size()));
+
+    for (int row = 0; row < static_cast<int>(cached_local_models_.size()); ++row) {
+        const auto& entry = cached_local_models_[row];
+
+        auto* name_item = new QTableWidgetItem(QString::fromStdString(entry.display_name));
+        local_model_table_->setItem(row, 0, name_item);
+
+        auto* ver_item = new QTableWidgetItem(QString::fromStdString(entry.version_hint));
+        local_model_table_->setItem(row, 1, ver_item);
+
+        auto* bb_item = new QTableWidgetItem(QString::fromStdString(entry.backbone_hint));
+        local_model_table_->setItem(row, 2, bb_item);
+
+        auto* prec_item = new QTableWidgetItem(QString::fromStdString(entry.precision_hint));
+        local_model_table_->setItem(row, 3, prec_item);
+
+        auto* load_button = new QPushButton(qs("加载"), local_model_table_);
+        connect(load_button, &QPushButton::clicked, this, [this, row]() {
+            onLocalModelLoad(row);
+        });
+        local_model_table_->setCellWidget(row, 4, load_button);
+    }
+
+    local_model_table_->resizeColumnsToContents();
+    setStatusText(qs("扫描完成，发现 ") + QString::number(cached_local_models_.size()) +
+                  qs(" 个本地模型"));
+}
+
+std::vector<LocalModelEntry> MainWindow::scanLocalModels(const std::string& model_dir) const {
+    std::vector<LocalModelEntry> entries;
+
+    if (!std::filesystem::is_directory(model_dir)) {
+        logMessage("scanLocalModels: directory does not exist: " + model_dir);
+        return entries;
+    }
+
+    // Collect all .param files, then look for matching .bin
+    std::map<std::string, std::string> param_files;   // stem -> full path
+    std::map<std::string, std::string> bin_files;      // stem -> full path
+
+    for (const auto& entry : std::filesystem::directory_iterator(model_dir)) {
+        if (!entry.is_regular_file()) continue;
+        const auto path = entry.path();
+        const auto ext = path.extension().string();
+        if (ext == ".param") {
+            param_files[path.stem().string()] = path.string();
+        } else if (ext == ".bin") {
+            bin_files[path.stem().string()] = path.string();
+        }
+    }
+
+    // Match .param with .bin by stem name
+    for (const auto& [stem, param_path] : param_files) {
+        auto bin_it = bin_files.find(stem);
+        if (bin_it == bin_files.end()) continue;  // no matching .bin
+
+        LocalModelEntry model_entry;
+        model_entry.param_path = param_path;
+        model_entry.bin_path = bin_it->second;
+        model_entry.display_name = stem;
+
+        // Infer version, backbone, and precision from the filename pattern.
+        // V2 pattern: backbone.family.version.precision.param
+        //   e.g. "mobilenet_v3_small.trislot_decoder.v2_0.fp16.param"
+        // V1 pattern: resnet18_equal_symbol_latest.fp16.param
+        //   e.g. "resnet34_digit_latest.fp32.param"
+        const auto parts = [&]() {
+            std::vector<std::string> result;
+            std::istringstream iss(stem);
+            std::string token;
+            while (std::getline(iss, token, '.')) {
+                result.push_back(token);
+            }
+            return result;
+        }();
+
+        if (parts.size() >= 4 && parts[1] == "trislot_decoder") {
+            // V2 model
+            model_entry.version_hint = "v2";
+            model_entry.backbone_hint = parts[0];
+            model_entry.precision_hint = parts.back();
+        } else if (parts.size() >= 2) {
+            // Likely V1 model
+            model_entry.version_hint = "v1";
+            model_entry.backbone_hint = parts[0];
+            model_entry.precision_hint = parts.back();
+        }
+
+        entries.push_back(std::move(model_entry));
+    }
+
+    return entries;
+}
+
+void MainWindow::onLocalModelLoad(int row) {
+    if (row < 0 || row >= static_cast<int>(cached_local_models_.size())) return;
+
+    const auto& entry = cached_local_models_[row];
+    logMessage("onLocalModelLoad: loading model=" + entry.display_name +
+               ", param=" + entry.param_path +
+               ", bin=" + entry.bin_path);
+
+    // If model is loaded, release first
+    if (model_loaded_) {
+        onReleaseModel();
+    }
+
+    // Update settings based on the local model entry
+    if (entry.version_hint == "v2") {
+        current_model_version_ = shmtu::cas::ocr::ModelVersion::V2;
+        model_version_combo_->setCurrentIndex(0);
+        if (!entry.backbone_hint.empty()) {
+            current_v2_backbone_ = entry.backbone_hint;
+        }
+    } else if (entry.version_hint == "v1") {
+        current_model_version_ = shmtu::cas::ocr::ModelVersion::V1;
+        model_version_combo_->setCurrentIndex(1);
+    }
+
+    if (!entry.precision_hint.empty()) {
+        const int prec_index = precision_combo_->findText(QString::fromStdString(entry.precision_hint));
+        if (prec_index >= 0) {
+            precision_combo_->setCurrentIndex(prec_index);
+        }
+    }
+
+    updateV2ModelSettings();
+    setStatusText(qs("正在加载本地模型: ") + QString::fromStdString(entry.display_name));
+
+    loadModelFromCurrentSettings();
 }
 
 }  // namespace shmtu::cas::ocr::gui
