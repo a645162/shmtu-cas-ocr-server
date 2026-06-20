@@ -142,7 +142,7 @@ bool downloadUrlToFile(const std::string& url,
     return ok;
 }
 
-std::string computeSha256(const std::string& filepath) {
+std::string computeSha256Local(const std::string& filepath) {
     std::string cmd = "sha256sum \"" + filepath + "\" 2>/dev/null";
     FILE* pipe = popen(cmd.c_str(), "r");
     if (!pipe) {
@@ -313,7 +313,7 @@ bool downloadModelFiles(const std::string& model_dir,
                 // HTTP 200 — verify checksum if available
                 const auto checksum_it = checksums.find(filename);
                 if (checksum_it != checksums.end()) {
-                    const auto actual_hash = computeSha256(filepath);
+                    const auto actual_hash = computeSha256Local(filepath);
                     if (actual_hash.empty()) {
                         logMessage("downloadModelFiles: sha256sum command failed for " +
                                    filename + ", skipping verification");
@@ -484,7 +484,7 @@ bool downloadV2Artifact(const shmtu::cas::ocr::ModelInfo& model,
             }
 
             // Verify SHA256
-            const auto actual_hash = computeSha256(dest);
+            const auto actual_hash = computeSha256Local(dest);
             if (actual_hash.empty()) {
                 logMessage("downloadV2Artifact: sha256sum failed for " + dest +
                            ", skipping verification");

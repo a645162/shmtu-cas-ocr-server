@@ -21,6 +21,8 @@ class QPushButton;
 class QProgressBar;
 class QResizeEvent;
 class QScrollArea;
+class QTableWidget;
+class QTableWidgetItem;
 class QToolButton;
 class QVBoxLayout;
 class QWidget;
@@ -70,6 +72,15 @@ private:
     void updateGpuAvailabilityUi();
     void updateModelStatusUi();
     void updateV2ModelSettings();
+
+    // Tag browsing & model listing
+    void onRefreshTags();
+    void onTagSelected(int index);
+    void refreshModelTable();
+
+    // Local model scanning
+    void onScanLocalModels();
+    void onLoadLocalModel(int row);
 
     void onDownloadCaptcha();
     void onOpenLocalImage();
@@ -144,6 +155,29 @@ private:
     QScrollArea* batch_scroll_area_ = nullptr;
     QWidget* batch_list_widget_ = nullptr;
     QVBoxLayout* batch_list_layout_ = nullptr;
+
+    // Tag browsing & model listing
+    QComboBox* tag_combo_ = nullptr;
+    QPushButton* refresh_tags_button_ = nullptr;
+    QTableWidget* model_table_ = nullptr;
+    std::vector<std::string> cached_tags_;
+    shmtu::cas::ocr::ReleaseManifest cached_manifest_;
+    std::string cached_manifest_tag_;
+
+    // Local model scanning
+    QTableWidget* local_model_table_ = nullptr;
+    QPushButton* scan_local_button_ = nullptr;
+
+    // Scanned local model info for "Load" clicks
+    struct LocalModelEntry {
+        std::string version;       // "v1" or "v2"
+        std::string display_name;  // human-readable
+        std::string backbone;      // v2 backbone name (empty for v1)
+        std::string precision;     // "fp16" or "fp32"
+        std::string param_path;    // full path to .param file
+        std::string bin_path;      // full path to .bin file
+    };
+    std::vector<LocalModelEntry> local_models_;
 };
 
 }  // namespace shmtu::cas::ocr::gui
