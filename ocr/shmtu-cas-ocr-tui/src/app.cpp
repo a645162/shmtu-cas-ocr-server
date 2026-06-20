@@ -3,6 +3,8 @@
 
 #include "tui/components.h"
 
+#include <shmtu/cas_ocr/gui/model_download.h>
+
 #include <ftxui/component/component.hpp>
 #include <ftxui/component/screen_interactive.hpp>
 #include <ftxui/dom/elements.hpp>
@@ -333,14 +335,55 @@ void App::startDownloadWorker(int model_index, const std::string& engine,
                 f.release_asset_name);
             const std::string file_dest =
                 (std::filesystem::path(dest) / f.release_asset_name).string();
-            ok = http_.downloadToFileWithProgress(
-                     file_url, file_dest,
-                     [this](long long now, long long total) {
-                         download_screen_.updateBytes(now, total);
-                         return !download_screen_.shouldCancel();
-                     },
-                     http_status, err) ||
-                 ok;
+            bool file_ok = http_.downloadToFileWithProgress(
+                file_url, file_dest,
+                [this](long long now, long long total) {
+                    download_screen_.updateBytes(now, total);
+                    return !download_screen_.shouldCancel();
+                },
+                http_status, err);
+            if (file_ok) {
+                // Verify SHA256 if the manifest provides a digest.
+                if (!f.sha256.empty()) {
+                    const auto actual_hash =
+                        shmtu::cas::ocr::gui::computeSha256(file_dest);
+                    if (!actual_hash.empty() &&
+                        actual_hash != f.sha256) {
+                        std::error_code ec;
+                        std::filesystem::remove(file_dest, ec);
+                        file_ok = false;
+                        err = "SHA256 mismatch for " + f.release_asset_name;
+                        // Try fallback source.
+                        const std::string fallback_source =
+                            useGiteeFromEnv() ? "github" : "gitee";
+                        const std::string fallback_url =
+                            github_.buildAssetUrl(
+                                fallback_source, tag,
+                                f.release_asset_name);
+                        file_ok = http_.downloadToFileWithProgress(
+                            fallback_url, file_dest,
+                            [this](long long now, long long total) {
+                                download_screen_.updateBytes(now, total);
+                                return !download_screen_.shouldCancel();
+                            },
+                            http_status, err);
+                        if (file_ok && !f.sha256.empty()) {
+                            const auto retry_hash =
+                                shmtu::cas::ocr::gui::computeSha256(
+                                    file_dest);
+                            if (!retry_hash.empty() &&
+                                retry_hash != f.sha256) {
+                                std::error_code ec;
+                                std::filesystem::remove(file_dest, ec);
+                                file_ok = false;
+                                err = "SHA256 mismatch (fallback) for " +
+                                      f.release_asset_name;
+                            }
+                        }
+                    }
+                }
+            }
+            ok = file_ok || ok;
         }
         if (ok) {
             download_screen_.finish(true, "Downloaded to " + dest);

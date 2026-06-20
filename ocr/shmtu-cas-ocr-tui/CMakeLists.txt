@@ -34,6 +34,11 @@ set(TUI_SOURCES
     src/http/http_client.cpp
     src/github/github_client.cpp
     src/github/semver.cpp
+    # Reuse model_download.cpp + logging.cpp from the GUI for SHA256 verification
+    # and V2 download infrastructure. Both files are self-contained (no Qt6
+    # dependency) so they can be compiled into any target.
+    ${CMAKE_SOURCE_DIR}/ocr/shmtu-cas-ocr-gui/src/model_download.cpp
+    ${CMAKE_SOURCE_DIR}/ocr/shmtu-cas-ocr-gui/src/logging.cpp
 )
 
 # --------------------------------------------------------------------------
@@ -49,6 +54,7 @@ shmtu_apply_target_version(
 target_include_directories(shmtu_cas_ocr_tui
     PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/src
+        ${CMAKE_SOURCE_DIR}/ocr/shmtu-cas-ocr-gui/include
 )
 
 target_link_libraries(shmtu_cas_ocr_tui

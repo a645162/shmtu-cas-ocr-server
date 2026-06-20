@@ -99,4 +99,9 @@ std::vector<std::string> fetchV2ReleaseTags(long& http_status,
 // Returns empty string on failure.
 std::string fetchLatestV2Tag(long& http_status, std::string& error_message);
 
+// Compute the SHA-256 hex digest of a file.  Returns the lowercase 64-char
+// hex string on success, or an empty string on failure (file not found /
+// sha256sum not available).
+std::string computeSha256(const std::string& filepath);
+
 }  // namespace shmtu::cas::ocr::gui
